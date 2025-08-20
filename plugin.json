@@ -1,11 +1,11 @@
 {
-  "name": "Example Plugin",
-  "author": "John Doe",
+  "name": "SDAchievement",
+  "author": "Guilhem Mateo",
   "flags": ["debug", "_root"],
   "api_version": 1,
   "publish": {
-    "tags": ["template", "root"],
-    "description": "Decky example plugin.",
-    "image": "https://opengraph.githubassets.com/1/SteamDeckHomebrew/PluginLoader"
+    "tags": ["achievements", "progress", "steam", "tracker"],
+    "description": "Decky plugin to track game progess and achievement ",
+    "image": "https://https://opengraph.githubassets.com/1/Wariie/SDAchivement"
   }
 }
