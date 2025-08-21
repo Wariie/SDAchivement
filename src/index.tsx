@@ -101,7 +101,17 @@ const setSteamUserId = callable<[user_id: string], boolean>("set_steam_user_id")
 const setTestGame = callable<[app_id: number], boolean>("set_test_game");
 const loadSettings = callable<[], any>("load_settings");
 const refreshCache = callable<[app_id?: number], boolean>("refresh_cache");
+const clearTestGame = callable<[], boolean>("clear_test_game");
+const getDebugInfo = callable<[], any>("get_debug_info");
 // const getSteamUserId = callable<[], string>("get_current_steam_user");
+
+function formatGlobalPercent(percent: any): string {
+  if (percent === null || percent === undefined || isNaN(percent)) {
+    return "N/A";
+  }
+  return `${Number(percent).toFixed(1)}%`;
+}
+
 
 // Main content component
 function Content() {
@@ -400,7 +410,11 @@ function Content() {
     
     // Filter by rarity
     if (filterRarity > 0) {
-      filtered = filtered.filter(a => a.global_percent && a.global_percent <= filterRarity);
+        filtered = filtered.filter(a => 
+            a.global_percent !== null && 
+            !isNaN(a.global_percent) && 
+            a.global_percent <= filterRarity
+        );
     }
     
     // Filter hidden if not showing
@@ -414,7 +428,9 @@ function Content() {
         case "name":
           return a.display_name.localeCompare(b.display_name);
         case "rarity":
-          return (a.global_percent || 100) - (b.global_percent || 100);
+            const aPercent = (a.global_percent !== null && !isNaN(a.global_percent)) ? a.global_percent : 100;
+            const bPercent = (b.global_percent !== null && !isNaN(b.global_percent)) ? b.global_percent : 100;
+            return aPercent - bPercent;
         case "unlock":
         default:
           // Unlocked first, then by time
@@ -439,11 +455,11 @@ function Content() {
           showContextMenu(
             <Menu label={achievement.display_name}>
               <MenuItem>{achievement.description || "Hidden achievement"}</MenuItem>
-              {achievement.global_percent !== null && (
+              {achievement.global_percent !== null && !isNaN(achievement.global_percent) && (
                 <MenuItem>
-                  <FaPercent /> {achievement.global_percent.toFixed(1)}% of players
+                    <FaPercent /> {formatGlobalPercent(achievement.global_percent)} of players
                 </MenuItem>
-              )}
+             )}
               {achievement.unlocked && achievement.unlock_time && (
                 <MenuItem>
                   <FaClock /> Unlocked: {formatTime(achievement.unlock_time)}
@@ -502,7 +518,7 @@ function Content() {
             }}>
               <FaStar style={{ color: "#FFD700", fontSize: "16px" }} />
               <span style={{ fontSize: "10px", opacity: 0.8 }}>
-                {achievement.global_percent.toFixed(1)}%
+                {formatGlobalPercent(achievement.global_percent)}
               </span>
             </div>
           )}
@@ -519,50 +535,78 @@ function Content() {
           <>
             {/* Current Game Info */}
             <PanelSection title="Current Game">
-              {currentGame ? (
-                <>
-                  <PanelSectionRow>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <FaGamepad />
-                      <span style={{ fontWeight: "bold" }}>{currentGame.name}</span>
-                    </div>
-                  </PanelSectionRow>
-                  
-                  {currentGame.has_achievements && (
+                {currentGame ? (
+                    <>
                     <PanelSectionRow>
-                      <span style={{ fontSize: "12px", opacity: 0.8 }}>
-                        {currentGame.achievement_count} achievements available
-                      </span>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <FaGamepad />
+                        <span style={{ fontWeight: "bold" }}>{currentGame.name}</span>
+                        {/* Show test mode indicator */}
+                        {currentGame.name.startsWith("[TEST]") && (
+                            <span style={{ 
+                            backgroundColor: "#ff6b6b", 
+                            color: "white", 
+                            padding: "2px 6px", 
+                            borderRadius: "4px", 
+                            fontSize: "10px",
+                            fontWeight: "bold"
+                            }}>
+                            TEST MODE
+                            </span>
+                        )}
+                        </div>
                     </PanelSectionRow>
-                  )}
-                </>
-              ) : (
+                    
+                    {currentGame.has_achievements && (
+                        <PanelSectionRow>
+                        <span style={{ fontSize: "12px", opacity: 0.8 }}>
+                            {currentGame.achievement_count} achievements available
+                        </span>
+                        </PanelSectionRow>
+                    )}
+                    
+                    {/* Show warning if in test mode */}
+                    {currentGame.name.startsWith("[TEST]") && (
+                        <PanelSectionRow>
+                        <div style={{ 
+                            backgroundColor: "rgba(255, 107, 107, 0.1)", 
+                            border: "1px solid rgba(255, 107, 107, 0.3)",
+                            borderRadius: "4px",
+                            padding: "8px",
+                            fontSize: "11px"
+                        }}>
+                            ⚠️ Test mode active - Go to Settings to clear test game for normal detection
+                        </div>
+                        </PanelSectionRow>
+                    )}
+                    </>
+                ) : (
+                    <PanelSectionRow>
+                    <div style={{ opacity: 0.6 }}>
+                        No game currently running
+                        {!apiKeySet && " - API key needed"}
+                    </div>
+                    </PanelSectionRow>
+                )}
+                
                 <PanelSectionRow>
-                  <div style={{ opacity: 0.6 }}>
-                    No game currently running
-                    {!apiKeySet && " - API key needed"}
-                  </div>
+                    <ButtonItem
+                    layout="below"
+                    onClick={async () => {
+                        const game = await fetchCurrentGame();
+                        if (game) {
+                        await fetchAchievements(game.app_id);
+                        }
+                    }}
+                    disabled={isLoading}
+                    >
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <FaSync className={isLoading ? "spinning" : ""} />
+                        {currentGame?.name?.startsWith("[TEST]") ? "Refresh Test Game" : "Check for Game"}
+                    </div>
+                    </ButtonItem>
                 </PanelSectionRow>
-              )}
-              
-              <PanelSectionRow>
-                <ButtonItem
-                  layout="below"
-                  onClick={async () => {
-                    const game = await fetchCurrentGame();
-                    if (game) {
-                      await fetchAchievements(game.app_id);
-                    }
-                  }}
-                  disabled={isLoading}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <FaSync className={isLoading ? "spinning" : ""} />
-                    Check for Game
-                  </div>
-                </ButtonItem>
-              </PanelSectionRow>
-            </PanelSection>
+                </PanelSection>
 
             {/* Achievement Progress */}
             {achievements && !achievements.error && (
@@ -639,16 +683,26 @@ function Content() {
 
             {/* Achievement List */}
             {achievements && !achievements.error && achievements.total > 0 && (
-              <PanelSection title="Achievements">
-                <Focusable style={{ maxHeight: "400px", overflowY: "auto" }}>
-                  {getSortedAchievements().map((achievement) => (
+            <PanelSection title="Achievements">
+                <div 
+                className="achievement-scroll-container"
+                style={{ 
+                    maxHeight: "400px", 
+                    overflowY: "auto",
+                    overflowX: "hidden",
+                    height: "auto"
+                }}
+                >
+                <Focusable className="no-gap-list">
+                    {getSortedAchievements().map((achievement) => (
                     <AchievementItem 
-                      key={achievement.api_name} 
-                      achievement={achievement} 
+                        key={achievement.api_name} 
+                        achievement={achievement} 
                     />
-                  ))}
+                    ))}
                 </Focusable>
-              </PanelSection>
+                </div>
+            </PanelSection>
             )}
             
             {/* Error message */}
@@ -725,7 +779,7 @@ function Content() {
                             <div style={{ textAlign: "center" }}>
                               <FaStar style={{ color: "#FFD700" }} />
                               <div style={{ fontSize: "10px" }}>
-                                {ach.global_percent.toFixed(1)}%
+                                {formatGlobalPercent(ach.global_percent)}
                               </div>
                             </div>
                           )}
@@ -912,33 +966,99 @@ function Content() {
                 </ButtonItem>
               </PanelSectionRow>
             </PanelSection>
-            
-            <PanelSection title="Testing">
-              <PanelSectionRow>
-                <TextField
-                  label="Test Game ID"
-                  value={testGameId}
-                  onChange={(e: any) => setTestGameId(e.target.value)}
-                  description="Steam App ID (e.g., 730 for CS:GO)"
-                />
-              </PanelSectionRow>
-              
-              <PanelSectionRow>
-                <ButtonItem
-                  layout="below"
-                  onClick={handleSetTestGame}
-                  disabled={!testGameId}
-                >
-                  Set Test Game
-                </ButtonItem>
-              </PanelSectionRow>
-              
-              <PanelSectionRow>
-                <div style={{ fontSize: "11px", opacity: 0.6 }}>
-                  Examples: 730 (CS:GO), 570 (Dota 2), 440 (TF2)
-                </div>
-              </PanelSectionRow>
+
+            <PanelSection title="Debug Information">
+                <PanelSectionRow>
+                    <ButtonItem
+                    layout="below"
+                    onClick={async () => {
+                        try {
+                        const debugInfo = await getDebugInfo();
+                        console.log("Debug Info:", debugInfo);
+                        
+                        let message = `API Key: ${debugInfo.api_key_set ? "Set" : "Not Set"}\n`;
+                        message += `User ID: ${debugInfo.user_id || "Not Set"}\n`;
+                        message += `Test App ID: ${debugInfo.test_app_id || "None"}\n`;
+                        message += `Detected App ID: ${debugInfo.detected_app_id || "None"}\n`;
+                        message += `Environment App ID: ${debugInfo.environment_app_id || "None"}`;
+                        
+                        toaster.toast({
+                            title: "Debug Info",
+                            body: message
+                        });
+                        } catch (error) {
+                        console.error("Failed to get debug info:", error);
+                        }
+                    }}
+                    >
+                    Show Debug Info
+                    </ButtonItem>
+                </PanelSectionRow>
             </PanelSection>
+
+            <PanelSection title="Testing">
+                <PanelSectionRow>
+                    <TextField
+                    label="Test Game ID"
+                    value={testGameId}
+                    onChange={(e: any) => setTestGameId(e.target.value)}
+                    description="Steam App ID (e.g., 730 for CS:GO)"
+                    />
+                </PanelSectionRow>
+                
+                <PanelSectionRow>
+                    <ButtonItem
+                    layout="below"
+                    onClick={handleSetTestGame}
+                    disabled={!testGameId}
+                    >
+                    Set Test Game
+                    </ButtonItem>
+                </PanelSectionRow>
+                
+                {/* Add this new button to clear test game */}
+                <PanelSectionRow>
+                    <ButtonItem
+                    layout="below"
+                    onClick={async () => {
+                        try {
+                        const success = await clearTestGame();
+                        if (success) {
+                            toaster.toast({
+                            title: "Test Game Cleared",
+                            body: "Now detecting games normally"
+                            });
+                            setTestGameId(""); // Clear the input field
+                            await handleFullRefresh(); // Refresh to detect current game
+                        } else {
+                            toaster.toast({
+                            title: "Error",
+                            body: "Failed to clear test game",
+                            critical: true
+                            });
+                        }
+                        } catch (error) {
+                        console.error("Failed to clear test game:", error);
+                        toaster.toast({
+                            title: "Error",
+                            body: "Failed to clear test game",
+                            critical: true
+                        });
+                        }
+                    }}
+                    >
+                    Clear Test Game (Return to Normal Detection)
+                    </ButtonItem>
+                </PanelSectionRow>
+                
+                <PanelSectionRow>
+                    <div style={{ fontSize: "11px", opacity: 0.6 }}>
+                    Examples: 730 (CS:GO), 570 (Dota 2), 440 (TF2)
+                    <br />
+                    Test mode overrides automatic game detection
+                    </div>
+                </PanelSectionRow>
+                </PanelSection>
             
             <PanelSection title="Auto Refresh">
               <PanelSectionRow>
@@ -1059,6 +1179,43 @@ const styles = `
   @keyframes spin {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
+  }
+
+  /* Fix scrolling gaps and improve scroll behavior */
+  .achievement-scroll-container {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+  }
+  
+  .achievement-scroll-container::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .achievement-scroll-container::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .achievement-scroll-container::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+  }
+  
+  .achievement-scroll-container::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(255, 255, 255, 0.5);
+  }
+  
+  /* Remove gaps in lists */
+  .no-gap-list {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  
+  .no-gap-list > * {
+    margin: 0 !important;
+    padding-bottom: 0 !important;
   }
 `;
 

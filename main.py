@@ -6,13 +6,14 @@ import decky
 import os
 import json
 import asyncio
-import aiohttp
 import time
 import subprocess
 import re
 import traceback
 from typing import Dict, List, Optional, Any
 from pathlib import Path
+
+from steam_api import SteamAPI  # custom wrapper
 
 # Setup logging
 log_file = os.path.join(decky.DECKY_PLUGIN_LOG_DIR, "achievement_tracker.log")
@@ -31,10 +32,6 @@ class Plugin:
     """
     Main plugin class for Steam Achievement Tracker
     """
-    
-    # Steam API endpoints
-    STEAM_API_BASE = "https://api.steampowered.com"
-    STEAM_STORE_API = "https://store.steampowered.com/api"
 
     def __init__(self):
         # Initialize paths right away so they're available in migration, unload, etc.
@@ -47,41 +44,35 @@ class Plugin:
         self.steam_api_key = None
         self.current_user_id = None
         self.test_app_id = None
-        self.achievement_cache = {}
-        self.last_cache_update = {}
+        self.api: Optional[SteamAPI] = None
     
     async def _main(self):
-        """Initialize the plugin"""
         try:
             log("INFO", "=== Steam Achievement Tracker Starting ===")
-
-            # Make sure directories exist
             self.settings_dir.mkdir(parents=True, exist_ok=True)
             self.cache_dir.mkdir(parents=True, exist_ok=True)
-            
-            log("INFO", f"Settings directory: {self.settings_dir}")
-            log("INFO", f"Cache directory: {self.cache_dir}")
-            
+
             # Load settings
             await self.load_settings()
             
-            # Try to get current Steam user
-            await self.get_current_steam_user()
+            # Get current user if not set
+            if not self.current_user_id:
+                self.current_user_id = await self.get_current_steam_user()
+
+            # Initialize API
+            self.api = SteamAPI(self.steam_api_key, self.current_user_id, self.cache_dir)
             
-            log("INFO", f"Steam API Key configured: {bool(self.steam_api_key)}")
+            log("INFO", f"Steam API Key: {bool(self.steam_api_key)}")
             log("INFO", f"Steam User ID: {self.current_user_id}")
-            log("INFO", "=== Plugin initialized successfully ===")
-            
         except Exception as e:
-            log("ERROR", f"Failed to initialize: {str(e)}")
-            log("ERROR", traceback.format_exc())
+            log("ERROR", f"Init failed: {e}")
+            log("ERROR", traceback.format_exc())        
     
     async def _unload(self):
         """Cleanup when plugin is unloaded"""
         log("INFO", "Steam Achievement Tracker unloading")
-        # Clear cache on unload
-        self.achievement_cache.clear()
-        self.last_cache_update.clear()
+        if self.api:
+            await self.api.close()
     
     async def _migration(self):
         """Handle plugin migrations"""
@@ -150,10 +141,11 @@ class Plugin:
             success = await self.save_settings(settings)
             
             if success:
-                # Clear cache when API key changes
-                self.achievement_cache.clear()
-                self.last_cache_update.clear()
-                log("INFO", "Steam API key saved and cache cleared")
+                # Update API instance
+                if self.api:
+                    await self.api.close()
+                self.api = SteamAPI(self.steam_api_key, self.current_user_id, self.cache_dir)
+                log("INFO", "Steam API key saved and API instance updated")
             
             return success
         except Exception as e:
@@ -181,10 +173,11 @@ class Plugin:
             success = await self.save_settings(settings)
             
             if success:
-                # Clear cache when user changes
-                self.achievement_cache.clear()
-                self.last_cache_update.clear()
-                log("INFO", "Steam user ID saved and cache cleared")
+                # Update API instance
+                if self.api:
+                    await self.api.close()
+                self.api = SteamAPI(self.steam_api_key, self.current_user_id, self.cache_dir)
+                log("INFO", "Steam user ID saved and API instance updated")
             
             return success
         except Exception as e:
@@ -206,6 +199,27 @@ class Plugin:
             return success
         except Exception as e:
             log("ERROR", f"Failed to set test game: {e}")
+            return False
+    
+    async def clear_test_game(self) -> bool:
+        """Clear the test game ID to return to normal detection"""
+        try:
+            log("INFO", "Clearing test game ID")
+            
+            self.test_app_id = None
+            
+            # Save to settings
+            settings = await self.load_settings()
+            if 'test_app_id' in settings:
+                del settings['test_app_id']
+            success = await self.save_settings(settings)
+            
+            if success:
+                log("INFO", "Test game cleared - will now detect running games normally")
+            
+            return success
+        except Exception as e:
+            log("ERROR", f"Failed to clear test game: {e}")
             return False
     
     # ==================== Steam User Functions ====================
@@ -260,31 +274,36 @@ class Plugin:
     async def get_current_game(self) -> Optional[Dict]:
         """Get currently running game"""
         try:
-            # Check if we have a test game ID set
+            # Check if we have a test game ID set - log this clearly
             if self.test_app_id:
-                log("INFO", f"Using test game ID: {self.test_app_id}")
+                log("WARNING", f"TEST MODE: Using test game ID {self.test_app_id} instead of detecting running game")
                 game_info = await self.get_game_info(self.test_app_id)
                 return {
                     "app_id": self.test_app_id,
-                    "name": game_info.get("name", f"App {self.test_app_id}"),
+                    "name": f"[TEST] {game_info.get('name', f'App {self.test_app_id}')}",
                     "is_running": True,
                     "has_achievements": game_info.get("has_achievements", False),
-                    "achievement_count": game_info.get("achievement_count", 0)
+                    "achievement_count": game_info.get("achievement_count", 0),
+                    "header_image": game_info.get("header_image", "")
                 }
             
             # Get the current app ID from Steam
             app_id = await self._get_running_app_id()
+            log("INFO", f"Detected running app ID: {app_id}")
             
             if app_id and app_id != 0:
                 # Get game details
                 game_info = await self.get_game_info(app_id)
-                return {
+                result = {
                     "app_id": app_id,
                     "name": game_info.get("name", f"App {app_id}"),
                     "is_running": True,
                     "has_achievements": game_info.get("has_achievements", False),
-                    "achievement_count": game_info.get("achievement_count", 0)
+                    "achievement_count": game_info.get("achievement_count", 0),
+                    "header_image": game_info.get("header_image", "")
                 }
+                log("INFO", f"Current game: {result['name']} (ID: {app_id})")
+                return result
             
             log("INFO", "No game currently running")
             return None
@@ -296,10 +315,12 @@ class Plugin:
     async def _get_running_app_id(self) -> Optional[int]:
         """Get the currently running Steam app ID"""
         try:
+            log("INFO", "Detecting running Steam app...")
+            
             # Method 1: Check for SteamAppId environment variable
             app_id = os.environ.get('SteamAppId')
             if app_id and app_id != "0":
-                log("INFO", f"Found app ID from environment: {app_id}")
+                log("INFO", f"Found app ID from environment variable: {app_id}")
                 return int(app_id)
             
             # Method 2: Check Steam overlay file
@@ -309,39 +330,93 @@ class Plugin:
                     with open(overlay_file, 'r') as f:
                         app_id = f.read().strip()
                         if app_id and app_id != "0":
-                            log("INFO", f"Found app ID from overlay: {app_id}")
+                            log("INFO", f"Found app ID from overlay file: {app_id}")
                             return int(app_id)
-                except:
-                    pass
+                except Exception as e:
+                    log("WARNING", f"Failed to read overlay file: {e}")
             
-            # Method 3: Check for running Steam game processes
+            # Method 3: Check Steam's AppID files in /dev/shm
+            for shm_file in ["/dev/shm/SteamAppId", "/dev/shm/steam_appid.txt"]:
+                try:
+                    shm_path = Path(shm_file)
+                    if shm_path.exists():
+                        with open(shm_path, 'r') as f:
+                            app_id = f.read().strip()
+                            if app_id and app_id != "0":
+                                log("INFO", f"Found app ID from {shm_file}: {app_id}")
+                                return int(app_id)
+                except Exception as e:
+                    log("DEBUG", f"Could not read {shm_file}: {e}")
+            
+            # Method 4: Check for running Steam game processes
             try:
+                # Check for reaper processes with AppId
                 result = subprocess.run(['pgrep', '-f', 'reaper.*AppId='], 
                                       capture_output=True, text=True, timeout=5)
                 if result.stdout:
-                    match = re.search(r'AppId=(\d+)', result.stdout)
-                    if match:
-                        app_id = match.group(1)
-                        log("INFO", f"Found app ID from process: {app_id}")
-                        return int(app_id)
-            except:
-                pass
+                    for line in result.stdout.strip().split('\n'):
+                        if line:
+                            # Get the command line for this PID
+                            try:
+                                cmdline_result = subprocess.run(['cat', f'/proc/{line}/cmdline'], 
+                                                              capture_output=True, text=True, timeout=2)
+                                if cmdline_result.stdout:
+                                    match = re.search(r'AppId=(\d+)', cmdline_result.stdout)
+                                    if match:
+                                        app_id = match.group(1)
+                                        if app_id != "0":
+                                            log("INFO", f"Found app ID from reaper process: {app_id}")
+                                            return int(app_id)
+                            except:
+                                continue
+            except Exception as e:
+                log("DEBUG", f"Process check failed: {e}")
             
-            # Method 4: Check Steam registry
-            registry_file = Path(decky.DECKY_USER_HOME) / ".steam/registry.vdf"
-            if registry_file.exists():
-                try:
-                    with open(registry_file, 'r', encoding='utf-8', errors='ignore') as f:
-                        content = f.read()
-                        match = re.search(r'"RunningAppID"\s+"(\d+)"', content)
-                        if match:
-                            app_id = match.group(1)
-                            if app_id != "0":
-                                log("INFO", f"Found app ID from registry: {app_id}")
-                                return int(app_id)
-                except:
-                    pass
+            # Method 5: Check Steam registry file
+            registry_paths = [
+                Path(decky.DECKY_USER_HOME) / ".steam/registry.vdf",
+                Path(decky.DECKY_USER_HOME) / ".local/share/Steam/registry.vdf",
+                Path("/home/deck/.steam/registry.vdf"),
+                Path("/home/deck/.local/share/Steam/registry.vdf")
+            ]
             
+            for registry_file in registry_paths:
+                if registry_file.exists():
+                    try:
+                        with open(registry_file, 'r', encoding='utf-8', errors='ignore') as f:
+                            content = f.read()
+                            # Look for RunningAppID
+                            match = re.search(r'"RunningAppID"\s+"(\d+)"', content)
+                            if match:
+                                app_id = match.group(1)
+                                if app_id != "0":
+                                    log("INFO", f"Found app ID from registry: {app_id}")
+                                    return int(app_id)
+                    except Exception as e:
+                        log("DEBUG", f"Failed to read registry {registry_file}: {e}")
+            
+            # Method 6: Check for common Steam game processes
+            try:
+                common_games = {
+                    'csgo': 730,
+                    'dota2': 570,
+                    'tf2': 440,
+                    'hl2': 220,
+                    'left4dead2': 550
+                }
+                
+                result = subprocess.run(['ps', 'aux'], capture_output=True, text=True, timeout=5)
+                running_processes = result.stdout.lower()
+                
+                for game_name, game_id in common_games.items():
+                    if game_name in running_processes:
+                        log("INFO", f"Found {game_name} process, assuming app ID: {game_id}")
+                        return game_id
+                        
+            except Exception as e:
+                log("DEBUG", f"Common games check failed: {e}")
+            
+            log("INFO", "No running Steam game detected")
             return None
             
         except Exception as e:
@@ -350,210 +425,39 @@ class Plugin:
     
     async def get_game_info(self, app_id: int) -> Dict:
         """Get game information from Steam Store API"""
+        if not self.api:
+            return {"app_id": app_id, "name": f"App {app_id}", "has_achievements": False, "achievement_count": 0}
+        
         try:
-            # Check cache first
-            cache_file = self.cache_dir / f"game_{app_id}.json"
-            if cache_file.exists():
-                cache_age = time.time() - cache_file.stat().st_mtime
-                if cache_age < 86400:  # 24 hour cache
-                    with open(cache_file, 'r') as f:
-                        return json.load(f)
-            
-            # Fetch from Steam Store API (no API key needed)
-            async with aiohttp.ClientSession() as session:
-                url = f"{self.STEAM_STORE_API}/appdetails?appids={app_id}"
-                async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        if str(app_id) in data and data[str(app_id)]["success"]:
-                            game_data = data[str(app_id)]["data"]
-                            
-                            # Extract relevant info
-                            info = {
-                                "app_id": app_id,
-                                "name": game_data.get("name", ""),
-                                "has_achievements": game_data.get("achievements", {}).get("total", 0) > 0,
-                                "achievement_count": game_data.get("achievements", {}).get("total", 0),
-                                "header_image": game_data.get("header_image", ""),
-                                "categories": [cat["description"] for cat in game_data.get("categories", [])]
-                            }
-                            
-                            # Cache the result
-                            with open(cache_file, 'w') as f:
-                                json.dump(info, f)
-                            
-                            return info
+            return await self.api.get_app_details(app_id)
         except Exception as e:
             log("ERROR", f"Failed to get game info for {app_id}: {e}")
-        
-        return {"app_id": app_id, "name": f"App {app_id}", "has_achievements": False}
+            return {"app_id": app_id, "name": f"App {app_id}", "has_achievements": False, "achievement_count": 0}
     
     # ==================== Achievement Functions ====================
     
     async def get_achievements(self, app_id: int = None) -> Dict:
-        """Get achievements for a game"""
+        """Get achievements for a specific game"""
         try:
             if not app_id:
                 game = await self.get_current_game()
                 if not game:
-                    return {"error": "No game running. Set a test game in Settings."}
+                    return {"error": "No game running"}
                 app_id = game["app_id"]
-            
+
+            if not self.api:
+                return {"error": "Steam API not initialized"}
+
+            if not self.steam_api_key or not self.current_user_id:
+                return {"error": "Steam API key or user ID not configured"}
+
             log("INFO", f"Getting achievements for app {app_id}")
-            
-            # Check if we have required configuration
-            if not self.steam_api_key:
-                log("WARNING", "No Steam API key configured")
-                return {"error": "Steam API key not configured. Add it in Settings."}
-            
-            if not self.current_user_id:
-                log("WARNING", "No Steam user ID found")
-                return {"error": "Steam User ID not found. Add it in Settings."}
-            
-            # Check cache
-            cache_key = f"{app_id}_{self.current_user_id}"
-            if cache_key in self.achievement_cache:
-                cache_age = time.time() - self.last_cache_update.get(cache_key, 0)
-                if cache_age < 300:  # 5 minute cache
-                    log("INFO", f"Returning cached achievements for {app_id}")
-                    return self.achievement_cache[cache_key]
-            
-            # Get achievement data
-            schema = await self.get_achievement_schema(app_id)
-            player_achievements = await self.get_player_achievements(app_id)
-            global_stats = await self.get_global_achievement_stats(app_id)
-            
-            # Check if we got the schema
-            if not schema or "achievements" not in schema:
-                log("WARNING", f"No achievement schema found for app {app_id}")
-                return {"error": f"No achievements found for app {app_id}. Game might not have achievements."}
-            
-            # Combine the data
-            achievements_list = []
-            total = 0
-            unlocked = 0
-            
-            for ach_schema in schema["achievements"]:
-                total += 1
-                achievement = {
-                    "api_name": ach_schema["name"],
-                    "display_name": ach_schema.get("displayName", ach_schema["name"]),
-                    "description": ach_schema.get("description", ""),
-                    "icon": ach_schema.get("icon", ""),
-                    "icon_gray": ach_schema.get("icongray", ""),
-                    "hidden": ach_schema.get("hidden", 0) == 1,
-                    "unlocked": False,
-                    "unlock_time": None,
-                    "global_percent": None
-                }
-                
-                # Check if player has unlocked it
-                if player_achievements:
-                    for player_ach in player_achievements:
-                        if player_ach["apiname"] == ach_schema["name"] and player_ach["achieved"] == 1:
-                            achievement["unlocked"] = True
-                            achievement["unlock_time"] = player_ach.get("unlocktime", 0)
-                            unlocked += 1
-                            break
-                
-                # Add global stats
-                if global_stats:
-                    for stat in global_stats:
-                        if stat["name"] == ach_schema["name"]:
-                            achievement["global_percent"] = stat.get("percent", 0)
-                            break
-                
-                achievements_list.append(achievement)
-            
-            result = {
-                "app_id": app_id,
-                "total": total,
-                "unlocked": unlocked,
-                "percentage": round((unlocked / total * 100) if total > 0 else 0, 1),
-                "achievements": achievements_list
-            }
-            
-            # Update cache
-            self.achievement_cache[cache_key] = result
-            self.last_cache_update[cache_key] = time.time()
-            
-            log("INFO", f"Retrieved {total} achievements for app {app_id} ({unlocked} unlocked)")
+            result = await self.api.get_player_achievements(app_id)
             return result
-            
+
         except Exception as e:
-            log("ERROR", f"Failed to get achievements for {app_id}: {e}")
+            log("ERROR", f"Failed to get achievements: {e}")
             return {"error": f"Failed to get achievements: {str(e)}"}
-    
-    async def get_achievement_schema(self, app_id: int) -> Optional[Dict]:
-        """Get achievement schema from Steam API"""
-        if not self.steam_api_key:
-            return None
-            
-        try:
-            async with aiohttp.ClientSession() as session:
-                url = f"{self.STEAM_API_BASE}/ISteamUserStats/GetSchemaForGame/v2/"
-                params = {
-                    "key": self.steam_api_key,
-                    "appid": app_id,
-                    "l": "english"
-                }
-                async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=10)) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        game_data = data.get("game", {})
-                        if game_data:
-                            stats = game_data.get("availableGameStats", {})
-                            if stats and "achievements" in stats:
-                                log("INFO", f"Found {len(stats['achievements'])} achievements in schema for app {app_id}")
-                            return stats
-                    elif response.status == 403:
-                        log("ERROR", "API key is invalid or has no permissions")
-                    else:
-                        log("ERROR", f"Schema API returned status {response.status}")
-        except asyncio.TimeoutError:
-            log("ERROR", f"Timeout getting achievement schema for app {app_id}")
-        except Exception as e:
-            log("ERROR", f"Failed to get achievement schema: {e}")
-        return None
-    
-    async def get_player_achievements(self, app_id: int) -> Optional[List]:
-        """Get player's achievement progress"""
-        if not self.steam_api_key or not self.current_user_id:
-            return None
-            
-        try:
-            async with aiohttp.ClientSession() as session:
-                url = f"{self.STEAM_API_BASE}/ISteamUserStats/GetPlayerAchievements/v1/"
-                params = {
-                    "key": self.steam_api_key,
-                    "steamid": self.current_user_id,
-                    "appid": app_id,
-                    "l": "english"
-                }
-                async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=10)) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        if "playerstats" in data:
-                            achievements = data.get("playerstats", {}).get("achievements", [])
-                            log("INFO", f"Found {len(achievements)} player achievements for app {app_id}")
-                            return achievements
-        except Exception as e:
-            log("ERROR", f"Failed to get player achievements: {e}")
-        return None
-    
-    async def get_global_achievement_stats(self, app_id: int) -> Optional[List]:
-        """Get global achievement completion percentages"""
-        try:
-            async with aiohttp.ClientSession() as session:
-                url = f"{self.STEAM_API_BASE}/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v2/"
-                params = {"gameid": app_id}
-                async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=10)) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        return data.get("achievementpercentages", {}).get("achievements", [])
-        except Exception as e:
-            log("ERROR", f"Failed to get global achievement stats: {e}")
-        return None
     
     # ==================== Game Statistics ====================
     
@@ -566,151 +470,127 @@ class Plugin:
                     return {"error": "No game running"}
                 app_id = game["app_id"]
             
-            if not self.steam_api_key or not self.current_user_id:
+            if not self.api or not self.steam_api_key or not self.current_user_id:
                 return {"error": "Steam API key or user ID not configured"}
             
             log("INFO", f"Getting game stats for app {app_id}")
             
-            async with aiohttp.ClientSession() as session:
-                url = f"{self.STEAM_API_BASE}/ISteamUserStats/GetUserStatsForGame/v2/"
-                params = {
-                    "key": self.steam_api_key,
-                    "steamid": self.current_user_id,
-                    "appid": app_id
+            result = await self.api.get_user_stats_for_game(app_id)
+            if result:
+                stats = result.get("playerstats", {}).get("stats", [])
+                
+                # Process stats into readable format
+                processed_stats = {}
+                for stat in stats:
+                    processed_stats[stat["name"]] = stat["value"]
+                
+                return {
+                    "app_id": app_id,
+                    "stats": processed_stats
                 }
-                async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=10)) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        stats = data.get("playerstats", {}).get("stats", [])
-                        
-                        # Process stats into readable format
-                        processed_stats = {}
-                        for stat in stats:
-                            processed_stats[stat["name"]] = stat["value"]
-                        
-                        return {
-                            "app_id": app_id,
-                            "stats": processed_stats
-                        }
+            else:
+                return {"error": "Failed to retrieve stats"}
                         
         except Exception as e:
             log("ERROR", f"Failed to get game stats: {e}")
-            
-        return {"error": "Failed to retrieve stats"}
+            return {"error": "Failed to retrieve stats"}
     
     # ==================== Recent Achievements ====================
     
     async def get_recent_achievements(self, limit: int = 10) -> List[Dict]:
         """Get recently unlocked achievements across all games"""
         try:
-            if not self.steam_api_key or not self.current_user_id:
+            if not self.api or not self.steam_api_key or not self.current_user_id:
                 log("WARNING", "Missing API key or user ID for recent achievements")
                 return []
             
             log("INFO", f"Getting recent achievements (limit: {limit})")
-            
-            async with aiohttp.ClientSession() as session:
-                # Get recently played games
-                url = f"{self.STEAM_API_BASE}/IPlayerService/GetRecentlyPlayedGames/v1/"
-                params = {
-                    "key": self.steam_api_key,
-                    "steamid": self.current_user_id,
-                    "count": 10
-                }
-                async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=10)) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        games = data.get("response", {}).get("games", [])
-                        
-                        recent_achievements = []
-                        
-                        # Check each game for recent achievements
-                        for game in games[:5]:  # Limit to 5 games for performance
-                            achievements = await self.get_achievements(game["appid"])
-                            if "achievements" in achievements:
-                                for ach in achievements["achievements"]:
-                                    if ach["unlocked"] and ach["unlock_time"]:
-                                        recent_achievements.append({
-                                            "game_name": game.get("name", f"App {game['appid']}"),
-                                            "game_id": game["appid"],
-                                            "achievement_name": ach["display_name"],
-                                            "achievement_desc": ach["description"],
-                                            "unlock_time": ach["unlock_time"],
-                                            "icon": ach["icon"],
-                                            "global_percent": ach.get("global_percent", 0)
-                                        })
-                        
-                        # Sort by unlock time and return most recent
-                        recent_achievements.sort(key=lambda x: x["unlock_time"], reverse=True)
-                        return recent_achievements[:limit]
+            return await self.api.get_recent_achievements(limit)
                         
         except Exception as e:
             log("ERROR", f"Failed to get recent achievements: {e}")
-        
-        return []
+            return []
     
     # ==================== Overall Progress ====================
     
     async def get_achievement_progress(self) -> Dict:
         """Get overall achievement progress across all games"""
         try:
-            if not self.steam_api_key or not self.current_user_id:
+            if not self.api or not self.steam_api_key or not self.current_user_id:
                 return {"error": "Not configured"}
             
             log("INFO", "Getting overall achievement progress")
             
-            async with aiohttp.ClientSession() as session:
-                # Get owned games
-                url = f"{self.STEAM_API_BASE}/IPlayerService/GetOwnedGames/v1/"
-                params = {
-                    "key": self.steam_api_key,
-                    "steamid": self.current_user_id,
-                    "include_appinfo": True,
-                    "include_played_free_games": True
-                }
-                async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=10)) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        games = data.get("response", {}).get("games", [])
+            # Get owned games
+            owned_games_response = await self.api.get_owned_games()
+            if not owned_games_response:
+                return {"error": "Failed to get owned games"}
+            
+            games = owned_games_response.get("response", {}).get("games", [])
+            log("INFO", f"Found {len(games)} owned games")
+            
+            total_achievements = 0
+            unlocked_achievements = 0
+            perfect_games = []
+            games_with_achievements = 0
+            
+            # Limit to first 20 games for performance, but process more than before
+            games_to_check = min(20, len(games))
+            log("INFO", f"Checking {games_to_check} games for achievements")
+            
+            for i, game in enumerate(games[:games_to_check]):
+                log("INFO", f"Processing game {i+1}/{games_to_check}: {game.get('name', 'Unknown')}")
+                
+                # Skip games without community visible stats
+                if not game.get("has_community_visible_stats"):
+                    continue
+                    
+                try:
+                    achievements = await self.get_achievements(game["appid"])
+                    if achievements and isinstance(achievements, dict) and not achievements.get("error"):
+                        if "total" in achievements and achievements["total"] > 0:
+                            games_with_achievements += 1
+                            total_achievements += achievements["total"]
+                            unlocked_achievements += achievements["unlocked"]
+                            
+                            log("INFO", f"Game {game.get('name')}: {achievements['unlocked']}/{achievements['total']} achievements")
+                            
+                            # Check for perfect completion
+                            if achievements["unlocked"] == achievements["total"] and achievements["total"] > 0:
+                                perfect_games.append({
+                                    "name": game.get("name", f"App {game['appid']}"),
+                                    "app_id": game["appid"],
+                                    "achievements": achievements["total"]
+                                })
+                                log("INFO", f"Perfect game found: {game.get('name')}")
+                    else:
+                        log("DEBUG", f"No achievements or error for game {game.get('name')}: {achievements}")
                         
-                        total_achievements = 0
-                        unlocked_achievements = 0
-                        perfect_games = []
-                        games_with_achievements = 0
-                        
-                        # Limit to first 10 games for performance
-                        games_to_check = min(10, len(games))
-                        for game in games[:games_to_check]:
-                            if game.get("has_community_visible_stats"):
-                                achievements = await self.get_achievements(game["appid"])
-                                if "total" in achievements and achievements["total"] > 0:
-                                    games_with_achievements += 1
-                                    total_achievements += achievements["total"]
-                                    unlocked_achievements += achievements["unlocked"]
-                                    
-                                    if achievements["unlocked"] == achievements["total"]:
-                                        perfect_games.append({
-                                            "name": game.get("name", f"App {game['appid']}"),
-                                            "app_id": game["appid"],
-                                            "achievements": achievements["total"]
-                                        })
-                        
-                        log("INFO", f"Progress calculated: {unlocked_achievements}/{total_achievements} achievements")
-                        
-                        return {
-                            "total_games": len(games),
-                            "games_with_achievements": games_with_achievements,
-                            "total_achievements": total_achievements,
-                            "unlocked_achievements": unlocked_achievements,
-                            "average_completion": round((unlocked_achievements / total_achievements * 100) if total_achievements > 0 else 0, 1),
-                            "perfect_games": perfect_games,
-                            "perfect_games_count": len(perfect_games)
-                        }
+                except Exception as e:
+                    log("WARNING", f"Failed to get achievements for game {game.get('name', game['appid'])}: {e}")
+                    continue
+            
+            average_completion = round((unlocked_achievements / total_achievements * 100) if total_achievements > 0 else 0, 1)
+            
+            result = {
+                "total_games": len(games),
+                "games_with_achievements": games_with_achievements,
+                "total_achievements": total_achievements,
+                "unlocked_achievements": unlocked_achievements,
+                "average_completion": average_completion,
+                "perfect_games": perfect_games,
+                "perfect_games_count": len(perfect_games)
+            }
+            
+            log("INFO", f"Progress calculated: {unlocked_achievements}/{total_achievements} achievements ({average_completion}% avg)")
+            log("INFO", f"Perfect games: {len(perfect_games)}")
+            
+            return result
                         
         except Exception as e:
             log("ERROR", f"Failed to get achievement progress: {e}")
-        
-        return {"error": "Failed to calculate progress"}
+            return {"error": f"Failed to calculate progress: {str(e)}"}
+
     
     # ==================== Utility Functions ====================
     
@@ -718,15 +598,19 @@ class Plugin:
         """Force refresh cache for a game or all games"""
         try:
             if app_id:
-                cache_key = f"{app_id}_{self.current_user_id}"
-                if cache_key in self.achievement_cache:
-                    del self.achievement_cache[cache_key]
-                if cache_key in self.last_cache_update:
-                    del self.last_cache_update[cache_key]
+                # Remove specific cache files
+                cache_files = [
+                    self.cache_dir / f"game_{app_id}.json"
+                ]
+                for cache_file in cache_files:
+                    if cache_file.exists():
+                        cache_file.unlink()
                 log("INFO", f"Cache refreshed for app {app_id}")
             else:
-                self.achievement_cache.clear()
-                self.last_cache_update.clear()
+                # Clear all cache files
+                if self.cache_dir.exists():
+                    for cache_file in self.cache_dir.glob("*.json"):
+                        cache_file.unlink()
                 log("INFO", "All cache cleared")
             
             return True
@@ -744,3 +628,32 @@ class Plugin:
             return "No log file found"
         except Exception as e:
             return f"Error reading log: {str(e)}"
+    
+    async def get_debug_info(self) -> Dict:
+        """Get debugging information about current state"""
+        try:
+            debug_info = {
+                "api_key_set": bool(self.steam_api_key),
+                "user_id": self.current_user_id,
+                "test_app_id": self.test_app_id,
+                "detected_app_id": None,
+                "environment_app_id": os.environ.get('SteamAppId'),
+                "overlay_file_exists": Path("/dev/shm/SteamOverlayAppId").exists(),
+                "steam_processes": []
+            }
+            
+            # Get detected app ID
+            debug_info["detected_app_id"] = await self._get_running_app_id()
+            
+            # Get Steam processes
+            try:
+                result = subprocess.run(['pgrep', '-f', 'steam'], capture_output=True, text=True, timeout=5)
+                if result.stdout:
+                    debug_info["steam_processes"] = result.stdout.strip().split('\n')
+            except:
+                pass
+            
+            return debug_info
+        except Exception as e:
+            log("ERROR", f"Failed to get debug info: {e}")
+            return {"error": str(e)}
