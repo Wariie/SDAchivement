@@ -5,26 +5,21 @@ import {
   Navigation,
   staticClasses,
   DialogButton,
-  ProgressBar,
   ProgressBarWithInfo,
   ToggleField,
   TextField,
   Focusable,
   Menu,
   MenuItem,
-  showContextMenu,
-  ConfirmModal,
-  showModal
+  showContextMenu
 } from "@decky/ui";
 import {
-  addEventListener,
-  removeEventListener,
   callable,
   definePlugin,
   toaster
 } from "@decky/api";
 import { useState, useEffect, useCallback } from "react";
-import { FaTrophy, FaGamepad, FaClock, FaStar, FaSync, FaKey, FaCheck, FaLock, FaPercent, FaChartLine } from "react-icons/fa";
+import { FaTrophy, FaGamepad, FaClock, FaStar, FaSync, FaKey, FaCheck, FaLock, FaPercent, FaChartLine, FaUser } from "react-icons/fa";
 
 // Type definitions
 interface Achievement {
@@ -102,9 +97,11 @@ const getGameStats = callable<[app_id?: number], GameStats>("get_game_stats");
 const getRecentAchievements = callable<[limit: number], RecentAchievement[]>("get_recent_achievements");
 const getAchievementProgress = callable<[], OverallProgress>("get_achievement_progress");
 const setSteamApiKey = callable<[api_key: string], boolean>("set_steam_api_key");
+const setSteamUserId = callable<[user_id: string], boolean>("set_steam_user_id");
+const setTestGame = callable<[app_id: number], boolean>("set_test_game");
 const loadSettings = callable<[], any>("load_settings");
-const saveSettings = callable<[settings: any], boolean>("save_settings");
 const refreshCache = callable<[app_id?: number], boolean>("refresh_cache");
+// const getSteamUserId = callable<[], string>("get_current_steam_user");
 
 // Main content component
 function Content() {
@@ -123,6 +120,9 @@ function Content() {
   const [filterRarity, setFilterRarity] = useState(0);
   const [steamApiKey, setSteamApiKeyState] = useState("");
   const [apiKeySet, setApiKeySet] = useState(false);
+  const [testGameId, setTestGameId] = useState("");
+  const [steamUserId, setSteamUserIdState] = useState("");
+  const [loadingMessage, setLoadingMessage] = useState("");
 
   // Fetch current game
   const fetchCurrentGame = useCallback(async () => {
@@ -134,11 +134,6 @@ function Content() {
       }
     } catch (error) {
       console.error("Failed to fetch current game:", error);
-      toaster.toast({
-        title: "Error",
-        body: "Failed to fetch current game",
-        critical: true
-      });
     }
     return null;
   }, []);
@@ -146,6 +141,7 @@ function Content() {
   // Fetch achievements for a game
   const fetchAchievements = useCallback(async (appId?: number) => {
     setIsLoading(true);
+    setLoadingMessage("Loading achievements...");
     try {
       const result = await getAchievements(appId);
       if (result && !result.error) {
@@ -156,11 +152,18 @@ function Content() {
           body: result.error,
           critical: true
         });
+        setAchievements(null);
       }
     } catch (error) {
       console.error("Failed to fetch achievements:", error);
+      toaster.toast({
+        title: "Error",
+        body: "Failed to fetch achievements",
+        critical: true
+      });
     } finally {
       setIsLoading(false);
+      setLoadingMessage("");
     }
   }, []);
 
@@ -178,6 +181,8 @@ function Content() {
 
   // Fetch recent achievements
   const fetchRecentAchievements = useCallback(async () => {
+    setIsLoading(true);
+    setLoadingMessage("Loading recent achievements...");
     try {
       const result = await getRecentAchievements(20);
       if (result) {
@@ -185,12 +190,16 @@ function Content() {
       }
     } catch (error) {
       console.error("Failed to fetch recent achievements:", error);
+    } finally {
+      setIsLoading(false);
+      setLoadingMessage("");
     }
   }, []);
 
   // Fetch overall progress
   const fetchOverallProgress = useCallback(async () => {
     setIsLoading(true);
+    setLoadingMessage("Calculating overall progress...");
     try {
       const result = await getAchievementProgress();
       if (result && !result.error) {
@@ -200,6 +209,7 @@ function Content() {
       console.error("Failed to fetch overall progress:", error);
     } finally {
       setIsLoading(false);
+      setLoadingMessage("");
     }
   }, []);
 
@@ -209,6 +219,7 @@ function Content() {
       const result = await loadSettings();
       if (result) {
         setApiKeySet(!!result.steam_api_key);
+        setSteamUserIdState(result.steam_user_id || "");
         setAutoRefresh(result.auto_refresh ?? true);
         setRefreshInterval(result.refresh_interval ?? 30);
       }
@@ -220,14 +231,22 @@ function Content() {
   // Save API key
   const saveApiKey = useCallback(async () => {
     try {
-      await setSteamApiKey(steamApiKey);
-      setApiKeySet(true);
-      toaster.toast({
-        title: "Success",
-        body: "Steam API key saved successfully!"
-      });
-      // Refresh data with new API key
-      await handleFullRefresh();
+      const success = await setSteamApiKey(steamApiKey);
+      if (success) {
+        setApiKeySet(true);
+        toaster.toast({
+          title: "Success",
+          body: "Steam API key saved successfully!"
+        });
+        // Refresh data with new API key
+        await handleFullRefresh();
+      } else {
+        toaster.toast({
+          title: "Error",
+          body: "Failed to save API key",
+          critical: true
+        });
+      }
     } catch (error) {
       console.error("Failed to save API key:", error);
       toaster.toast({
@@ -236,8 +255,75 @@ function Content() {
         critical: true
       });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [steamApiKey]);
+
+  // Save Steam user ID
+  const saveUserId = useCallback(async () => {
+    try {
+      if (!steamUserId.match(/^\d{17}$/)) {
+        toaster.toast({
+          title: "Invalid ID",
+          body: "Steam ID must be 17 digits",
+          critical: true
+        });
+        return;
+      }
+      
+      const success = await setSteamUserId(steamUserId);
+      if (success) {
+        toaster.toast({
+          title: "Success",
+          body: "Steam User ID saved!"
+        });
+        // Refresh data with new user ID
+        await handleFullRefresh();
+      } else {
+        toaster.toast({
+          title: "Error",
+          body: "Failed to save User ID",
+          critical: true
+        });
+      }
+    } catch (error) {
+      console.error("Failed to save user ID:", error);
+      toaster.toast({
+        title: "Error",
+        body: "Failed to save User ID",
+        critical: true
+      });
+    }
+  }, [steamUserId]);
+
+  // Set test game
+  const handleSetTestGame = useCallback(async () => {
+    try {
+      const appId = parseInt(testGameId);
+      if (isNaN(appId)) {
+        toaster.toast({
+          title: "Invalid ID",
+          body: "Please enter a valid number",
+          critical: true
+        });
+        return;
+      }
+      
+      const success = await setTestGame(appId);
+      if (success) {
+        await handleFullRefresh();
+        toaster.toast({
+          title: "Test Game Set",
+          body: `Testing with App ID: ${appId}`
+        });
+      }
+    } catch (error) {
+      console.error("Failed to set test game:", error);
+      toaster.toast({
+        title: "Error",
+        body: "Failed to set test game",
+        critical: true
+      });
+    }
+  }, [testGameId]);
 
   // Handle refresh
   const handleRefresh = useCallback(async () => {
@@ -254,8 +340,7 @@ function Content() {
     } catch (error) {
       console.error("Failed to refresh:", error);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentGame]);
+  }, [currentGame, fetchAchievements, fetchGameStats]);
 
   // Full data refresh
   const handleFullRefresh = useCallback(async () => {
@@ -264,17 +349,28 @@ function Content() {
       await fetchAchievements(game.app_id);
       await fetchGameStats(game.app_id);
     }
-    await fetchRecentAchievements();
-    await fetchOverallProgress();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (currentTab === Tab.RECENT) {
+      await fetchRecentAchievements();
+    }
+    if (currentTab === Tab.OVERALL) {
+      await fetchOverallProgress();
+    }
+  }, [currentTab, fetchCurrentGame, fetchAchievements, fetchGameStats, fetchRecentAchievements, fetchOverallProgress]);
 
   // Initial load
   useEffect(() => {
     loadPluginSettings();
     handleFullRefresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Tab change handler
+  useEffect(() => {
+    if (currentTab === Tab.RECENT && recentAchievements.length === 0) {
+      fetchRecentAchievements();
+    } else if (currentTab === Tab.OVERALL && !overallProgress) {
+      fetchOverallProgress();
+    }
+  }, [currentTab]);
 
   // Auto-refresh
   useEffect(() => {
@@ -288,8 +384,7 @@ function Content() {
       
       return () => clearInterval(interval);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoRefresh, refreshInterval, currentTab]);
+  }, [autoRefresh, refreshInterval, currentTab, fetchCurrentGame, fetchAchievements]);
 
   // Format timestamp
   const formatTime = (timestamp: number): string => {
@@ -443,9 +538,30 @@ function Content() {
                 </>
               ) : (
                 <PanelSectionRow>
-                  <div style={{ opacity: 0.6 }}>No game currently running</div>
+                  <div style={{ opacity: 0.6 }}>
+                    No game currently running
+                    {!apiKeySet && " - API key needed"}
+                  </div>
                 </PanelSectionRow>
               )}
+              
+              <PanelSectionRow>
+                <ButtonItem
+                  layout="below"
+                  onClick={async () => {
+                    const game = await fetchCurrentGame();
+                    if (game) {
+                      await fetchAchievements(game.app_id);
+                    }
+                  }}
+                  disabled={isLoading}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <FaSync className={isLoading ? "spinning" : ""} />
+                    Check for Game
+                  </div>
+                </ButtonItem>
+              </PanelSectionRow>
             </PanelSection>
 
             {/* Achievement Progress */}
@@ -460,99 +576,69 @@ function Content() {
                 </PanelSectionRow>
                 
                 <PanelSectionRow>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", marginBottom: "4px" }}>
-                    <span>
-                      <FaTrophy style={{ marginRight: "4px", color: "#FFD700" }} />
-                      {achievements.unlocked} / {achievements.total} unlocked
-                    </span>
+                  <div style={{ 
+                    display: "flex", 
+                    justifyContent: "space-between", 
+                    fontSize: "12px"
+                  }}>
                     <span>{achievements.percentage}% complete</span>
+                    <span>{achievements.total - achievements.unlocked} remaining</span>
                   </div>
-                  <ProgressBar 
-                    nProgress={achievements.percentage / 100}
-                    nTransitionSec={0.3}
-                  />
                 </PanelSectionRow>
               </PanelSection>
             )}
 
             {/* Filters and Sort */}
-            <PanelSection title="Filters">
-              <PanelSectionRow>
-                <ButtonItem
-                  layout="below"
-                  onClick={() => {
-                    showContextMenu(
-                      <Menu label="Sort By">
-                        <MenuItem onClick={() => setSortBy("unlock")}>
-                          Recently Unlocked
-                        </MenuItem>
-                        <MenuItem onClick={() => setSortBy("name")}>
-                          Name
-                        </MenuItem>
-                        <MenuItem onClick={() => setSortBy("rarity")}>
-                          Rarity
-                        </MenuItem>
-                      </Menu>
-                    );
-                  }}
-                >
-                  Sort: {sortBy === "unlock" ? "Recently Unlocked" : sortBy === "name" ? "Name" : "Rarity"}
-                </ButtonItem>
-              </PanelSectionRow>
-              
-              <PanelSectionRow>
-                <ToggleField
-                  label="Show hidden achievements"
-                  checked={showHidden}
-                  onChange={setShowHidden}
-                />
-              </PanelSectionRow>
-              
-              <PanelSectionRow>
-                <ButtonItem
-                  layout="below"
-                  onClick={() => {
-                    showContextMenu(
-                      <Menu label="Filter by Rarity">
-                        <MenuItem onClick={() => setFilterRarity(0)}>
-                          All achievements
-                        </MenuItem>
-                        <MenuItem onClick={() => setFilterRarity(50)}>
-                          Uncommon (&lt;50%)
-                        </MenuItem>
-                        <MenuItem onClick={() => setFilterRarity(25)}>
-                          Rare (&lt;25%)
-                        </MenuItem>
-                        <MenuItem onClick={() => setFilterRarity(10)}>
-                          Very Rare (&lt;10%)
-                        </MenuItem>
-                        <MenuItem onClick={() => setFilterRarity(5)}>
-                          Ultra Rare (&lt;5%)
-                        </MenuItem>
-                      </Menu>
-                    );
-                  }}
-                >
-                  Rarity: {filterRarity === 0 ? "All" : `<${filterRarity}%`}
-                </ButtonItem>
-              </PanelSectionRow>
-              
-              <PanelSectionRow>
-                <ButtonItem
-                  layout="below"
-                  onClick={handleRefresh}
-                  disabled={isLoading}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <FaSync className={isLoading ? "spinning" : ""} />
-                    Refresh
-                  </div>
-                </ButtonItem>
-              </PanelSectionRow>
-            </PanelSection>
+            {achievements && !achievements.error && achievements.total > 0 && (
+              <PanelSection title="Filters">
+                <PanelSectionRow>
+                  <ButtonItem
+                    layout="below"
+                    onClick={() => {
+                      showContextMenu(
+                        <Menu label="Sort By">
+                          <MenuItem onSelected={() => setSortBy("unlock")}>
+                            Recently Unlocked
+                          </MenuItem>
+                          <MenuItem onSelected={() => setSortBy("name")}>
+                            Name
+                          </MenuItem>
+                          <MenuItem onSelected={() => setSortBy("rarity")}>
+                            Rarity
+                          </MenuItem>
+                        </Menu>
+                      );
+                    }}
+                  >
+                    Sort: {sortBy === "unlock" ? "Recently Unlocked" : sortBy === "name" ? "Name" : "Rarity"}
+                  </ButtonItem>
+                </PanelSectionRow>
+                
+                <PanelSectionRow>
+                  <ToggleField
+                    label="Show hidden achievements"
+                    checked={showHidden}
+                    onChange={setShowHidden}
+                  />
+                </PanelSectionRow>
+                
+                <PanelSectionRow>
+                  <ButtonItem
+                    layout="below"
+                    onClick={handleRefresh}
+                    disabled={isLoading}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <FaSync className={isLoading ? "spinning" : ""} />
+                      Refresh
+                    </div>
+                  </ButtonItem>
+                </PanelSectionRow>
+              </PanelSection>
+            )}
 
             {/* Achievement List */}
-            {achievements && !achievements.error && (
+            {achievements && !achievements.error && achievements.total > 0 && (
               <PanelSection title="Achievements">
                 <Focusable style={{ maxHeight: "400px", overflowY: "auto" }}>
                   {getSortedAchievements().map((achievement) => (
@@ -565,11 +651,23 @@ function Content() {
               </PanelSection>
             )}
             
+            {/* Error message */}
             {achievements?.error && (
               <PanelSection>
                 <PanelSectionRow>
                   <div style={{ color: "#ff6b6b" }}>
-                    Error: {achievements.error}
+                    {achievements.error}
+                  </div>
+                </PanelSectionRow>
+              </PanelSection>
+            )}
+            
+            {/* Loading indicator */}
+            {isLoading && (
+              <PanelSection>
+                <PanelSectionRow>
+                  <div style={{ textAlign: "center", opacity: 0.6 }}>
+                    {loadingMessage || "Loading..."}
                   </div>
                 </PanelSectionRow>
               </PanelSection>
@@ -594,47 +692,55 @@ function Content() {
                 </ButtonItem>
               </PanelSectionRow>
               
-              <Focusable style={{ maxHeight: "500px", overflowY: "auto" }}>
-                {recentAchievements.map((ach, index) => (
-                  <PanelSectionRow key={`${ach.game_id}_${ach.unlock_time}_${index}`}>
-                    <ButtonItem
-                      layout="below"
-                      onClick={() => {
-                        Navigation.NavigateToExternalWeb(`steam://nav/games/details/${ach.game_id}`);
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                        {ach.icon && (
-                          <img 
-                            src={ach.icon} 
-                            style={{ width: "32px", height: "32px", borderRadius: "4px" }}
-                            alt=""
-                          />
-                        )}
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: "14px", fontWeight: "bold" }}>
-                            {ach.achievement_name}
-                          </div>
-                          <div style={{ fontSize: "12px", opacity: 0.7 }}>
-                            {ach.game_name}
-                          </div>
-                          <div style={{ fontSize: "11px", opacity: 0.6 }}>
-                            {formatTime(ach.unlock_time)}
-                          </div>
-                        </div>
-                        {ach.global_percent <= 10 && (
-                          <div style={{ textAlign: "center" }}>
-                            <FaStar style={{ color: "#FFD700" }} />
-                            <div style={{ fontSize: "10px" }}>
-                              {ach.global_percent.toFixed(1)}%
+              {recentAchievements.length > 0 ? (
+                <Focusable style={{ maxHeight: "500px", overflowY: "auto" }}>
+                  {recentAchievements.map((ach, index) => (
+                    <PanelSectionRow key={`${ach.game_id}_${ach.unlock_time}_${index}`}>
+                      <ButtonItem
+                        layout="below"
+                        onClick={() => {
+                          Navigation.NavigateToExternalWeb(`steam://nav/games/details/${ach.game_id}`);
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                          {ach.icon && (
+                            <img 
+                              src={ach.icon} 
+                              style={{ width: "32px", height: "32px", borderRadius: "4px" }}
+                              alt=""
+                            />
+                          )}
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: "14px", fontWeight: "bold" }}>
+                              {ach.achievement_name}
+                            </div>
+                            <div style={{ fontSize: "12px", opacity: 0.7 }}>
+                              {ach.game_name}
+                            </div>
+                            <div style={{ fontSize: "11px", opacity: 0.6 }}>
+                              {formatTime(ach.unlock_time)}
                             </div>
                           </div>
-                        )}
-                      </div>
-                    </ButtonItem>
-                  </PanelSectionRow>
-                ))}
-              </Focusable>
+                          {ach.global_percent <= 10 && (
+                            <div style={{ textAlign: "center" }}>
+                              <FaStar style={{ color: "#FFD700" }} />
+                              <div style={{ fontSize: "10px" }}>
+                                {ach.global_percent.toFixed(1)}%
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </ButtonItem>
+                    </PanelSectionRow>
+                  ))}
+                </Focusable>
+              ) : (
+                <PanelSectionRow>
+                  <div style={{ opacity: 0.6, textAlign: "center" }}>
+                    {isLoading ? "Loading recent achievements..." : "No recent achievements found"}
+                  </div>
+                </PanelSectionRow>
+              )}
             </PanelSection>
           </>
         );
@@ -684,7 +790,7 @@ function Content() {
               ) : (
                 <PanelSectionRow>
                   <div style={{ opacity: 0.6 }}>
-                    {overallProgress?.error || "Loading overall progress..."}
+                    {isLoading ? "Calculating overall progress..." : "Click below to calculate progress"}
                   </div>
                 </PanelSectionRow>
               )}
@@ -765,20 +871,80 @@ function Content() {
                 </ButtonItem>
               </PanelSectionRow>
               
-              {apiKeySet && (
+              {apiKeySet ? (
                 <PanelSectionRow>
                   <div style={{ color: "#4CAF50", fontSize: "12px" }}>
                     ✓ API Key is configured
                   </div>
                 </PanelSectionRow>
+              ) : (
+                <PanelSectionRow>
+                  <div style={{ color: "#ff6b6b", fontSize: "12px" }}>
+                    ✗ No API Key configured
+                  </div>
+                </PanelSectionRow>
               )}
+            </PanelSection>
+            
+            <PanelSection title="Steam User ID">
+              <PanelSectionRow>
+                <div style={{ fontSize: "12px", opacity: 0.8, marginBottom: "8px" }}>
+                  Find your Steam ID at: steamid.io
+                </div>
+              </PanelSectionRow>
+              
+              <PanelSectionRow>
+                <TextField
+                  label="Steam User ID"
+                  value={steamUserId}
+                  onChange={(e: any) => setSteamUserIdState(e.target.value)}
+                  description="17-digit Steam ID (76561...)"
+                />
+              </PanelSectionRow>
+              
+              <PanelSectionRow>
+                <ButtonItem
+                  layout="below"
+                  onClick={saveUserId}
+                  disabled={!steamUserId}
+                >
+                  <FaUser /> Save User ID
+                </ButtonItem>
+              </PanelSectionRow>
+            </PanelSection>
+            
+            <PanelSection title="Testing">
+              <PanelSectionRow>
+                <TextField
+                  label="Test Game ID"
+                  value={testGameId}
+                  onChange={(e: any) => setTestGameId(e.target.value)}
+                  description="Steam App ID (e.g., 730 for CS:GO)"
+                />
+              </PanelSectionRow>
+              
+              <PanelSectionRow>
+                <ButtonItem
+                  layout="below"
+                  onClick={handleSetTestGame}
+                  disabled={!testGameId}
+                >
+                  Set Test Game
+                </ButtonItem>
+              </PanelSectionRow>
+              
+              <PanelSectionRow>
+                <div style={{ fontSize: "11px", opacity: 0.6 }}>
+                  Examples: 730 (CS:GO), 570 (Dota 2), 440 (TF2)
+                </div>
+              </PanelSectionRow>
             </PanelSection>
             
             <PanelSection title="Auto Refresh">
               <PanelSectionRow>
                 <ToggleField
                   label="Enable auto-refresh"
-                  description="Automatically update achievements"
+                  description="Update achievements automatically"
                   checked={autoRefresh}
                   onChange={setAutoRefresh}
                 />
@@ -791,15 +957,15 @@ function Content() {
                     onClick={() => {
                       showContextMenu(
                         <Menu label="Refresh Interval">
-                          <MenuItem onClick={() => setRefreshInterval(15)}>15 seconds</MenuItem>
-                          <MenuItem onClick={() => setRefreshInterval(30)}>30 seconds</MenuItem>
-                          <MenuItem onClick={() => setRefreshInterval(60)}>1 minute</MenuItem>
-                          <MenuItem onClick={() => setRefreshInterval(300)}>5 minutes</MenuItem>
+                          <MenuItem onSelected={() => setRefreshInterval(15)}>15 seconds</MenuItem>
+                          <MenuItem onSelected={() => setRefreshInterval(30)}>30 seconds</MenuItem>
+                          <MenuItem onSelected={() => setRefreshInterval(60)}>1 minute</MenuItem>
+                          <MenuItem onSelected={() => setRefreshInterval(300)}>5 minutes</MenuItem>
                         </Menu>
                       );
                     }}
                   >
-                    Refresh every: {refreshInterval < 60 ? `${refreshInterval} seconds` : `${refreshInterval / 60} minutes`}
+                    Interval: {refreshInterval < 60 ? `${refreshInterval} seconds` : `${refreshInterval / 60} minutes`}
                   </ButtonItem>
                 </PanelSectionRow>
               )}
@@ -813,7 +979,7 @@ function Content() {
                     await refreshCache();
                     toaster.toast({
                       title: "Cache Cleared",
-                      body: "Achievement cache has been cleared successfully!"
+                      body: "Achievement cache has been cleared!"
                     });
                   }}
                 >
@@ -830,34 +996,50 @@ function Content() {
     <>
       {/* Tab Navigation */}
       <PanelSection>
-        <Focusable style={{ display: "flex", gap: "4px", marginBottom: "8px" }}>
+        <Focusable style={{ display: "flex", gap: "2px" }}>
           <DialogButton
-            style={{ flex: 1 }}
+            style={{ 
+              flex: 1, 
+              padding: "8px",
+              minWidth: "40px",
+              backgroundColor: currentTab === Tab.CURRENT_GAME ? "rgba(255,255,255,0.1)" : "transparent"
+            }}
             onClick={() => setCurrentTab(Tab.CURRENT_GAME)}
-            className={currentTab === Tab.CURRENT_GAME ? "gpfocus" : ""}
           >
-            <FaGamepad />
+            <FaGamepad size={16} />
           </DialogButton>
           <DialogButton
-            style={{ flex: 1 }}
+            style={{ 
+              flex: 1, 
+              padding: "8px",
+              minWidth: "40px",
+              backgroundColor: currentTab === Tab.RECENT ? "rgba(255,255,255,0.1)" : "transparent"
+            }}
             onClick={() => setCurrentTab(Tab.RECENT)}
-            className={currentTab === Tab.RECENT ? "gpfocus" : ""}
           >
-            <FaClock />
+            <FaClock size={16} />
           </DialogButton>
           <DialogButton
-            style={{ flex: 1 }}
+            style={{ 
+              flex: 1, 
+              padding: "8px",
+              minWidth: "40px",
+              backgroundColor: currentTab === Tab.OVERALL ? "rgba(255,255,255,0.1)" : "transparent"
+            }}
             onClick={() => setCurrentTab(Tab.OVERALL)}
-            className={currentTab === Tab.OVERALL ? "gpfocus" : ""}
           >
-            <FaChartLine />
+            <FaChartLine size={16} />
           </DialogButton>
           <DialogButton
-            style={{ flex: 1 }}
+            style={{ 
+              flex: 1, 
+              padding: "8px",
+              minWidth: "40px",
+              backgroundColor: currentTab === Tab.SETTINGS ? "rgba(255,255,255,0.1)" : "transparent"
+            }}
             onClick={() => setCurrentTab(Tab.SETTINGS)}
-            className={currentTab === Tab.SETTINGS ? "gpfocus" : ""}
           >
-            Settings
+            <FaKey size={16} />
           </DialogButton>
         </Focusable>
       </PanelSection>
@@ -878,10 +1060,6 @@ const styles = `
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
   }
-  
-  .gpfocus {
-    background: rgba(255, 255, 255, 0.1);
-  }
 `;
 
 // Plugin definition
@@ -893,32 +1071,13 @@ export default definePlugin(() => {
   styleElement.textContent = styles;
   document.head.appendChild(styleElement);
 
-  // Listen for achievement unlock events (future feature)
-  const achievementListener = addEventListener<[
-    game_name: string,
-    achievement_name: string,
-    rarity: number
-  ]>("achievement_unlocked", (game_name, achievement_name, rarity) => {
-    console.log("Achievement unlocked:", game_name, achievement_name, rarity);
-    toaster.toast({
-      title: "Achievement Unlocked!",
-      body: `${achievement_name} in ${game_name}${rarity < 10 ? " (Rare!)" : ""}`
-    });
-  });
-
   return {
-    // The name shown in various decky menus
     name: "Steam Achievement Tracker",
-    // The element displayed at the top of your plugin's menu
     titleView: <div className={staticClasses.Title}>Achievement Tracker</div>,
-    // The content of your plugin's menu
     content: <Content />,
-    // The icon displayed in the plugin list
     icon: <FaTrophy />,
-    // The function triggered when your plugin unloads
     onDismount() {
       console.log("Steam Achievement Tracker unloading");
-      removeEventListener("achievement_unlocked", achievementListener);
       styleElement.remove();
     },
   };
