@@ -1,13 +1,13 @@
 import aiohttp
-import asyncio
 import logging
 import json
 import time
+import decky
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 import ssl
 
-logger = logging.getLogger("steam_api")
+logger = decky.logger
 
 class SteamAPI:
     BASE_URL = "https://api.steampowered.com"
@@ -197,6 +197,18 @@ class SteamAPI:
                 if global_achievement_data and "achievements" in global_achievement_data:
                     global_achs = {a["name"]: a["percent"] for a in global_achievement_data["achievements"]}
 
+            # Validate that we have achievements data
+            if not schema_achs:
+                logger.warning(f"No achievements found in schema for app {app_id}")
+                return {
+                    "app_id": app_id,
+                    "total": 0,
+                    "unlocked": 0,
+                    "percentage": 0.0,
+                    "achievements": [],
+                    "error": "No achievements found for this game"
+                }
+
             achievements: List[Dict[str, Any]] = []
             unlocked_count = 0
 
@@ -230,13 +242,16 @@ class SteamAPI:
             total = len(achievements)
             percentage = round((unlocked_count / total) * 100, 2) if total > 0 else 0.0
 
-            return {
+            result = {
                 "app_id": app_id,
-                "total": total,
-                "unlocked": unlocked_count,
-                "percentage": percentage,
+                "total": int(total),  # Ensure these are integers
+                "unlocked": int(unlocked_count),
+                "percentage": float(percentage),  # Ensure this is a float
                 "achievements": achievements
             }
+            
+            logger.info(f"Achievement data for app {app_id}: {unlocked_count}/{total} ({percentage}%)")
+            return result
 
         except Exception as e:
             logger.error(f"Failed to get player achievements for app {app_id}: {e}")

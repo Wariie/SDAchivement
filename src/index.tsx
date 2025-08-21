@@ -49,6 +49,7 @@ interface GameInfo {
   is_running: boolean;
   has_achievements: boolean;
   achievement_count: number;
+  header_image?: string;
 }
 
 interface GameStats {
@@ -97,13 +98,10 @@ const getGameStats = callable<[app_id?: number], GameStats>("get_game_stats");
 const getRecentAchievements = callable<[limit: number], RecentAchievement[]>("get_recent_achievements");
 const getAchievementProgress = callable<[], OverallProgress>("get_achievement_progress");
 const setSteamApiKey = callable<[api_key: string], boolean>("set_steam_api_key");
-const setSteamUserId = callable<[user_id: string], boolean>("set_steam_user_id");
 const setTestGame = callable<[app_id: number], boolean>("set_test_game");
 const loadSettings = callable<[], any>("load_settings");
 const refreshCache = callable<[app_id?: number], boolean>("refresh_cache");
 const clearTestGame = callable<[], boolean>("clear_test_game");
-const getDebugInfo = callable<[], any>("get_debug_info");
-// const getSteamUserId = callable<[], string>("get_current_steam_user");
 
 function formatGlobalPercent(percent: any): string {
   if (percent === null || percent === undefined || isNaN(percent)) {
@@ -112,6 +110,29 @@ function formatGlobalPercent(percent: any): string {
   return `${Number(percent).toFixed(1)}%`;
 }
 
+function calculateProgress(unlocked: any, total: any) {
+  const unlockedNum = Number(unlocked) || 0;
+  const totalNum = Number(total) || 0;
+  
+  if (totalNum === 0) {
+    return 0;
+  }
+  
+  const progress = unlockedNum / totalNum;
+  return Math.max(0, Math.min(1, progress));
+}
+
+function formatProgressText(unlocked: any, total: any, showPercentage = false) {
+  const unlockedNum = Number(unlocked) || 0;
+  const totalNum = Number(total) || 0;
+  
+  if (showPercentage) {
+    const percentage = totalNum > 0 ? Math.round((unlockedNum / totalNum) * 100) : 0;
+    return `${unlockedNum} / ${totalNum} achievements (${percentage}%)`;
+  }
+  
+  return `${unlockedNum} / ${totalNum} achievements`;
+}
 
 // Main content component
 function Content() {
@@ -248,7 +269,6 @@ function Content() {
           title: "Success",
           body: "Steam API key saved successfully!"
         });
-        // Refresh data with new API key
         await handleFullRefresh();
       } else {
         toaster.toast({
@@ -266,43 +286,6 @@ function Content() {
       });
     }
   }, [steamApiKey]);
-
-  // Save Steam user ID
-  const saveUserId = useCallback(async () => {
-    try {
-      if (!steamUserId.match(/^\d{17}$/)) {
-        toaster.toast({
-          title: "Invalid ID",
-          body: "Steam ID must be 17 digits",
-          critical: true
-        });
-        return;
-      }
-      
-      const success = await setSteamUserId(steamUserId);
-      if (success) {
-        toaster.toast({
-          title: "Success",
-          body: "Steam User ID saved!"
-        });
-        // Refresh data with new user ID
-        await handleFullRefresh();
-      } else {
-        toaster.toast({
-          title: "Error",
-          body: "Failed to save User ID",
-          critical: true
-        });
-      }
-    } catch (error) {
-      console.error("Failed to save user ID:", error);
-      toaster.toast({
-        title: "Error",
-        body: "Failed to save User ID",
-        critical: true
-      });
-    }
-  }, [steamUserId]);
 
   // Set test game
   const handleSetTestGame = useCallback(async () => {
@@ -533,88 +516,196 @@ function Content() {
       case Tab.CURRENT_GAME:
         return (
           <>
-            {/* Current Game Info */}
-            <PanelSection title="Current Game">
-                {currentGame ? (
-                    <>
-                    <PanelSectionRow>
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <FaGamepad />
-                        <span style={{ fontWeight: "bold" }}>{currentGame.name}</span>
-                        {/* Show test mode indicator */}
-                        {currentGame.name.startsWith("[TEST]") && (
-                            <span style={{ 
-                            backgroundColor: "#ff6b6b", 
-                            color: "white", 
-                            padding: "2px 6px", 
-                            borderRadius: "4px", 
-                            fontSize: "10px",
-                            fontWeight: "bold"
-                            }}>
-                            TEST MODE
-                            </span>
-                        )}
-                        </div>
-                    </PanelSectionRow>
+            {/* Game Banner */}
+            {currentGame ? (
+              <>
+                <div style={{
+                  position: "relative",
+                  borderRadius: "8px",
+                  overflow: "hidden",
+                  marginBottom: "12px",
+                  minHeight: "80px",
+                  background: "linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)"
+                }}>
+                  {/* Background Image */}
+                  {currentGame.header_image && (
+                    <img 
+                      src={currentGame.header_image}
+                      style={{
+                        width: "100%",
+                        height: "80px",
+                        objectFit: "cover",
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        opacity: 0.8
+                      }}
+                      alt=""
+                    />
+                  )}
+                  
+                  {/* Overlay */}
+                  <div style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: "linear-gradient(to right, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.3) 100%)"
+                  }} />
+                  
+                  {/* Content */}
+                  <div style={{
+                    position: "relative",
+                    padding: "12px 16px",
+                    height: "80px",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "center",
+                    color: "white"
+                  }}>
+                    <div style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      marginBottom: "4px"
+                    }}>
+                      <h3 style={{
+                        margin: 0,
+                        fontSize: "16px",
+                        fontWeight: "bold",
+                        textShadow: "1px 1px 2px rgba(0,0,0,0.7)",
+                        flex: 1
+                      }}>
+                        {currentGame.name.replace("[TEST] ", "")}
+                      </h3>
+                      
+                      {/* Test mode indicator */}
+                      {currentGame.name.startsWith("[TEST]") && (
+                        <span style={{ 
+                          backgroundColor: "#ff6b6b", 
+                          color: "white", 
+                          padding: "2px 8px", 
+                          borderRadius: "12px", 
+                          fontSize: "10px",
+                          fontWeight: "bold",
+                          textShadow: "none"
+                        }}>
+                          TEST
+                        </span>
+                      )}
+                    </div>
                     
                     {currentGame.has_achievements && (
-                        <PanelSectionRow>
-                        <span style={{ fontSize: "12px", opacity: 0.8 }}>
-                            {currentGame.achievement_count} achievements available
-                        </span>
-                        </PanelSectionRow>
+                      <div style={{
+                        fontSize: "12px",
+                        opacity: 0.9,
+                        textShadow: "1px 1px 1px rgba(0,0,0,0.5)"
+                      }}>
+                        {currentGame.achievement_count} achievements available
+                      </div>
                     )}
-                    
-                    {/* Show warning if in test mode */}
-                    {currentGame.name.startsWith("[TEST]") && (
-                        <PanelSectionRow>
-                        <div style={{ 
-                            backgroundColor: "rgba(255, 107, 107, 0.1)", 
-                            border: "1px solid rgba(255, 107, 107, 0.3)",
-                            borderRadius: "4px",
-                            padding: "8px",
-                            fontSize: "11px"
-                        }}>
-                            ⚠️ Test mode active - Go to Settings to clear test game for normal detection
-                        </div>
-                        </PanelSectionRow>
-                    )}
-                    </>
-                ) : (
-                    <PanelSectionRow>
-                    <div style={{ opacity: 0.6 }}>
-                        No game currently running
-                        {!apiKeySet && " - API key needed"}
-                    </div>
-                    </PanelSectionRow>
-                )}
-                
-                <PanelSectionRow>
-                    <ButtonItem
-                    layout="below"
-                    onClick={async () => {
-                        const game = await fetchCurrentGame();
-                        if (game) {
-                        await fetchAchievements(game.app_id);
-                        }
+                  </div>
+                  
+                  {/* Action Button */}
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "8px",
+                      right: "8px",
+                      padding: "6px",
+                      borderRadius: "4px",
+                      backgroundColor: "rgba(255,255,255,0.2)",
+                      border: "1px solid rgba(255,255,255,0.3)",
+                      cursor: isLoading ? "not-allowed" : "pointer",
+                      opacity: isLoading ? 0.5 : 1,
+                      transition: "all 0.2s ease",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center"
                     }}
-                    disabled={isLoading}
-                    >
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <FaSync className={isLoading ? "spinning" : ""} />
-                        {currentGame?.name?.startsWith("[TEST]") ? "Refresh Test Game" : "Check for Game"}
-                    </div>
-                    </ButtonItem>
+                    onClick={isLoading ? undefined : async () => {
+                      const refreshedGame = await fetchCurrentGame();
+                      if (refreshedGame) {
+                        await fetchAchievements(refreshedGame.app_id);
+                      }
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isLoading) {
+                        e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.3)";
+                        e.currentTarget.style.borderColor = "rgba(255,255,255,0.5)";
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isLoading) {
+                        e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.2)";
+                        e.currentTarget.style.borderColor = "rgba(255,255,255,0.3)";
+                      }
+                    }}
+                  >
+                    <FaSync 
+                      style={{ 
+                        fontSize: "12px", 
+                        color: "white" 
+                      }} 
+                      className={isLoading ? "spinning" : ""} 
+                    />
+                  </div>
+                </div>
+                
+                {/* Test mode warning */}
+                {currentGame.name.startsWith("[TEST]") && (
+                  <PanelSection>
+                    <PanelSectionRow>
+                      <div style={{ 
+                        backgroundColor: "rgba(255, 107, 107, 0.1)", 
+                        border: "1px solid rgba(255, 107, 107, 0.3)",
+                        borderRadius: "4px",
+                        padding: "8px",
+                        fontSize: "11px",
+                        textAlign: "center"
+                      }}>
+                        ⚠️ Test mode active - Go to Settings to clear test game
+                      </div>
+                    </PanelSectionRow>
+                  </PanelSection>
+                )}
+              </>
+            ) : (
+              <PanelSection>
+                <PanelSectionRow>
+                  <div style={{ 
+                    textAlign: "center", 
+                    padding: "20px",
+                    opacity: 0.6 
+                  }}>
+                    <FaGamepad style={{ fontSize: "32px", marginBottom: "8px" }} />
+                    <div>No game currently running</div>
+                    {!apiKeySet && <div style={{ fontSize: "12px" }}>API key needed</div>}
+                  </div>
                 </PanelSectionRow>
-                </PanelSection>
+                <PanelSectionRow>
+                  <ButtonItem
+                    layout="below"
+                    onClick={fetchCurrentGame}
+                    disabled={isLoading}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <FaSync className={isLoading ? "spinning" : ""} />
+                      Check for Game
+                    </div>
+                  </ButtonItem>
+                </PanelSectionRow>
+              </PanelSection>
+            )}
 
             {/* Achievement Progress */}
             {achievements && !achievements.error && (
-              <PanelSection title="Achievement Progress">
+              <PanelSection title="Progress">
                 <PanelSectionRow>
                   <ProgressBarWithInfo
-                    nProgress={achievements.total > 0 ? achievements.unlocked / achievements.total : 0}
-                    sOperationText={`${achievements.unlocked} / ${achievements.total} achievements`}
+                    nProgress={calculateProgress(achievements.unlocked, achievements.total)}
+                    sOperationText={formatProgressText(achievements.unlocked, achievements.total)}
                     nTransitionSec={0.3}
                   />
                 </PanelSectionRow>
@@ -625,8 +716,8 @@ function Content() {
                     justifyContent: "space-between", 
                     fontSize: "12px"
                   }}>
-                    <span>{achievements.percentage}% complete</span>
-                    <span>{achievements.total - achievements.unlocked} remaining</span>
+                    <span>{Math.round(calculateProgress(achievements.unlocked, achievements.total) * 100)}% complete</span>
+                    <span>{(Number(achievements.total) || 0) - (Number(achievements.unlocked) || 0)} remaining</span>
                   </div>
                 </PanelSectionRow>
               </PanelSection>
@@ -641,13 +732,13 @@ function Content() {
                     onClick={() => {
                       showContextMenu(
                         <Menu label="Sort By">
-                          <MenuItem onSelected={() => setSortBy("unlock")}>
+                          <MenuItem onClick={() => setSortBy("unlock")}>
                             Recently Unlocked
                           </MenuItem>
-                          <MenuItem onSelected={() => setSortBy("name")}>
+                          <MenuItem onClick={() => setSortBy("name")}>
                             Name
                           </MenuItem>
-                          <MenuItem onSelected={() => setSortBy("rarity")}>
+                          <MenuItem onClick={() => setSortBy("rarity")}>
                             Rarity
                           </MenuItem>
                         </Menu>
@@ -683,26 +774,26 @@ function Content() {
 
             {/* Achievement List */}
             {achievements && !achievements.error && achievements.total > 0 && (
-            <PanelSection title="Achievements">
+              <PanelSection title="Achievements">
                 <div 
-                className="achievement-scroll-container"
-                style={{ 
+                  className="achievement-scroll-container"
+                  style={{ 
                     maxHeight: "400px", 
                     overflowY: "auto",
                     overflowX: "hidden",
                     height: "auto"
-                }}
+                  }}
                 >
-                <Focusable className="no-gap-list">
+                  <Focusable className="no-gap-list">
                     {getSortedAchievements().map((achievement) => (
-                    <AchievementItem 
+                      <AchievementItem 
                         key={achievement.api_name} 
                         achievement={achievement} 
-                    />
+                      />
                     ))}
-                </Focusable>
+                  </Focusable>
                 </div>
-            </PanelSection>
+              </PanelSection>
             )}
             
             {/* Error message */}
@@ -747,47 +838,53 @@ function Content() {
               </PanelSectionRow>
               
               {recentAchievements.length > 0 ? (
-                <Focusable style={{ maxHeight: "500px", overflowY: "auto" }}>
-                  {recentAchievements.map((ach, index) => (
-                    <PanelSectionRow key={`${ach.game_id}_${ach.unlock_time}_${index}`}>
-                      <ButtonItem
-                        layout="below"
-                        onClick={() => {
-                          Navigation.NavigateToExternalWeb(`steam://nav/games/details/${ach.game_id}`);
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                          {ach.icon && (
-                            <img 
-                              src={ach.icon} 
-                              style={{ width: "32px", height: "32px", borderRadius: "4px" }}
-                              alt=""
-                            />
-                          )}
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: "14px", fontWeight: "bold" }}>
-                              {ach.achievement_name}
-                            </div>
-                            <div style={{ fontSize: "12px", opacity: 0.7 }}>
-                              {ach.game_name}
-                            </div>
-                            <div style={{ fontSize: "11px", opacity: 0.6 }}>
-                              {formatTime(ach.unlock_time)}
-                            </div>
-                          </div>
-                          {ach.global_percent <= 10 && (
-                            <div style={{ textAlign: "center" }}>
-                              <FaStar style={{ color: "#FFD700" }} />
-                              <div style={{ fontSize: "10px" }}>
-                                {formatGlobalPercent(ach.global_percent)}
+                <div style={{ 
+                  maxHeight: "500px", 
+                  overflowY: "auto",
+                  overflowX: "hidden"
+                }}>
+                  <Focusable className="no-gap-list">
+                    {recentAchievements.map((ach, index) => (
+                      <PanelSectionRow key={`${ach.game_id}_${ach.unlock_time}_${index}`}>
+                        <ButtonItem
+                          layout="below"
+                          onClick={() => {
+                            Navigation.NavigateToExternalWeb(`steam://nav/games/details/${ach.game_id}`);
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                            {ach.icon && (
+                              <img 
+                                src={ach.icon} 
+                                style={{ width: "32px", height: "32px", borderRadius: "4px" }}
+                                alt=""
+                              />
+                            )}
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: "14px", fontWeight: "bold" }}>
+                                {ach.achievement_name}
+                              </div>
+                              <div style={{ fontSize: "12px", opacity: 0.7 }}>
+                                {ach.game_name}
+                              </div>
+                              <div style={{ fontSize: "11px", opacity: 0.6 }}>
+                                {formatTime(ach.unlock_time)}
                               </div>
                             </div>
-                          )}
-                        </div>
-                      </ButtonItem>
-                    </PanelSectionRow>
-                  ))}
-                </Focusable>
+                            {ach.global_percent !== null && !isNaN(ach.global_percent) && ach.global_percent <= 10 && (
+                              <div style={{ textAlign: "center" }}>
+                                <FaStar style={{ color: "#FFD700" }} />
+                                <div style={{ fontSize: "10px" }}>
+                                  {formatGlobalPercent(ach.global_percent)}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </ButtonItem>
+                      </PanelSectionRow>
+                    ))}
+                  </Focusable>
+                </div>
               ) : (
                 <PanelSectionRow>
                   <div style={{ opacity: 0.6, textAlign: "center" }}>
@@ -808,21 +905,21 @@ function Content() {
                   <PanelSectionRow>
                     <div style={{ display: "flex", justifyContent: "space-between" }}>
                       <span>Total Games</span>
-                      <span style={{ fontWeight: "bold" }}>{overallProgress.total_games}</span>
+                      <span style={{ fontWeight: "bold" }}>{overallProgress.total_games || 0}</span>
                     </div>
                   </PanelSectionRow>
                   
                   <PanelSectionRow>
                     <div style={{ display: "flex", justifyContent: "space-between" }}>
                       <span>Games with Achievements</span>
-                      <span style={{ fontWeight: "bold" }}>{overallProgress.games_with_achievements}</span>
+                      <span style={{ fontWeight: "bold" }}>{overallProgress.games_with_achievements || 0}</span>
                     </div>
                   </PanelSectionRow>
                   
                   <PanelSectionRow>
                     <ProgressBarWithInfo
-                      nProgress={overallProgress.total_achievements > 0 ? overallProgress.unlocked_achievements / overallProgress.total_achievements : 0}
-                      sOperationText={`${overallProgress.unlocked_achievements} / ${overallProgress.total_achievements} total achievements`}
+                      nProgress={calculateProgress(overallProgress.unlocked_achievements, overallProgress.total_achievements)}
+                      sOperationText={formatProgressText(overallProgress.unlocked_achievements, overallProgress.total_achievements, true)}
                       nTransitionSec={0.3}
                     />
                   </PanelSectionRow>
@@ -830,14 +927,14 @@ function Content() {
                   <PanelSectionRow>
                     <div style={{ display: "flex", justifyContent: "space-between" }}>
                       <span>Average Completion</span>
-                      <span style={{ fontWeight: "bold" }}>{overallProgress.average_completion}%</span>
+                      <span style={{ fontWeight: "bold" }}>{Number(overallProgress.average_completion) || 0}%</span>
                     </div>
                   </PanelSectionRow>
                   
                   <PanelSectionRow>
                     <div style={{ display: "flex", justifyContent: "space-between" }}>
                       <span>Perfect Games</span>
-                      <span style={{ fontWeight: "bold" }}>{overallProgress.perfect_games_count}</span>
+                      <span style={{ fontWeight: "bold" }}>{overallProgress.perfect_games_count || 0}</span>
                     </div>
                   </PanelSectionRow>
                 </>
@@ -865,29 +962,35 @@ function Content() {
             
             {overallProgress?.perfect_games && overallProgress.perfect_games.length > 0 && (
               <PanelSection title="Perfect Games">
-                <Focusable style={{ maxHeight: "300px", overflowY: "auto" }}>
-                  {overallProgress.perfect_games.map((game) => (
-                    <PanelSectionRow key={game.app_id}>
-                      <ButtonItem
-                        layout="below"
-                        onClick={() => {
-                          Navigation.NavigateToExternalWeb(`steam://nav/games/details/${game.app_id}`);
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                          <FaTrophy style={{ color: "#FFD700" }} />
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontWeight: "bold" }}>{game.name}</div>
-                            <div style={{ fontSize: "12px", opacity: 0.7 }}>
-                              {game.achievements} achievements
+                <div style={{ 
+                  maxHeight: "300px", 
+                  overflowY: "auto",
+                  overflowX: "hidden"
+                }}>
+                  <Focusable className="no-gap-list">
+                    {overallProgress.perfect_games.map((game) => (
+                      <PanelSectionRow key={game.app_id}>
+                        <ButtonItem
+                          layout="below"
+                          onClick={() => {
+                            Navigation.NavigateToExternalWeb(`steam://nav/games/details/${game.app_id}`);
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <FaTrophy style={{ color: "#FFD700" }} />
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontWeight: "bold" }}>{game.name}</div>
+                              <div style={{ fontSize: "12px", opacity: 0.7 }}>
+                                {game.achievements} achievements
+                              </div>
                             </div>
+                            <span style={{ color: "#4CAF50", fontWeight: "bold" }}>100%</span>
                           </div>
-                          <span style={{ color: "#4CAF50", fontWeight: "bold" }}>100%</span>
-                        </div>
-                      </ButtonItem>
-                    </PanelSectionRow>
-                  ))}
-                </Focusable>
+                        </ButtonItem>
+                      </PanelSectionRow>
+                    ))}
+                  </Focusable>
+                </div>
               </PanelSection>
             )}
           </>
@@ -940,125 +1043,91 @@ function Content() {
               )}
             </PanelSection>
             
-            <PanelSection title="Steam User ID">
+            {/* Steam User ID - Just display, don't allow editing */}
+            <PanelSection title="Steam User">
               <PanelSectionRow>
-                <div style={{ fontSize: "12px", opacity: 0.8, marginBottom: "8px" }}>
-                  Find your Steam ID at: steamid.io
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span>Steam User ID:</span>
+                  <span style={{ 
+                    fontFamily: "monospace", 
+                    fontSize: "12px",
+                    opacity: steamUserId ? 1 : 0.5
+                  }}>
+                    {steamUserId || "Not detected"}
+                  </span>
                 </div>
               </PanelSectionRow>
               
+              {steamUserId && (
+                <PanelSectionRow>
+                  <div style={{ fontSize: "11px", opacity: 0.6 }}>
+                    Automatically detected from Steam installation
+                  </div>
+                </PanelSectionRow>
+              )}
+            </PanelSection>
+
+            {/* Testing Section - Keep for debugging */}
+            <PanelSection title="Testing">
               <PanelSectionRow>
                 <TextField
-                  label="Steam User ID"
-                  value={steamUserId}
-                  onChange={(e: any) => setSteamUserIdState(e.target.value)}
-                  description="17-digit Steam ID (76561...)"
+                  label="Test Game ID"
+                  value={testGameId}
+                  onChange={(e: any) => setTestGameId(e.target.value)}
+                  description="Steam App ID (e.g., 730 for CS:GO)"
                 />
               </PanelSectionRow>
               
               <PanelSectionRow>
                 <ButtonItem
                   layout="below"
-                  onClick={saveUserId}
-                  disabled={!steamUserId}
+                  onClick={handleSetTestGame}
+                  disabled={!testGameId}
                 >
-                  <FaUser /> Save User ID
+                  Set Test Game
                 </ButtonItem>
               </PanelSectionRow>
-            </PanelSection>
-
-            <PanelSection title="Debug Information">
-                <PanelSectionRow>
-                    <ButtonItem
-                    layout="below"
-                    onClick={async () => {
-                        try {
-                        const debugInfo = await getDebugInfo();
-                        console.log("Debug Info:", debugInfo);
-                        
-                        let message = `API Key: ${debugInfo.api_key_set ? "Set" : "Not Set"}\n`;
-                        message += `User ID: ${debugInfo.user_id || "Not Set"}\n`;
-                        message += `Test App ID: ${debugInfo.test_app_id || "None"}\n`;
-                        message += `Detected App ID: ${debugInfo.detected_app_id || "None"}\n`;
-                        message += `Environment App ID: ${debugInfo.environment_app_id || "None"}`;
-                        
+              
+              <PanelSectionRow>
+                <ButtonItem
+                  layout="below"
+                  onClick={async () => {
+                    try {
+                      const success = await clearTestGame();
+                      if (success) {
                         toaster.toast({
-                            title: "Debug Info",
-                            body: message
+                          title: "Test Game Cleared",
+                          body: "Now detecting games normally"
                         });
-                        } catch (error) {
-                        console.error("Failed to get debug info:", error);
-                        }
-                    }}
-                    >
-                    Show Debug Info
-                    </ButtonItem>
-                </PanelSectionRow>
-            </PanelSection>
-
-            <PanelSection title="Testing">
-                <PanelSectionRow>
-                    <TextField
-                    label="Test Game ID"
-                    value={testGameId}
-                    onChange={(e: any) => setTestGameId(e.target.value)}
-                    description="Steam App ID (e.g., 730 for CS:GO)"
-                    />
-                </PanelSectionRow>
-                
-                <PanelSectionRow>
-                    <ButtonItem
-                    layout="below"
-                    onClick={handleSetTestGame}
-                    disabled={!testGameId}
-                    >
-                    Set Test Game
-                    </ButtonItem>
-                </PanelSectionRow>
-                
-                {/* Add this new button to clear test game */}
-                <PanelSectionRow>
-                    <ButtonItem
-                    layout="below"
-                    onClick={async () => {
-                        try {
-                        const success = await clearTestGame();
-                        if (success) {
-                            toaster.toast({
-                            title: "Test Game Cleared",
-                            body: "Now detecting games normally"
-                            });
-                            setTestGameId(""); // Clear the input field
-                            await handleFullRefresh(); // Refresh to detect current game
-                        } else {
-                            toaster.toast({
-                            title: "Error",
-                            body: "Failed to clear test game",
-                            critical: true
-                            });
-                        }
-                        } catch (error) {
-                        console.error("Failed to clear test game:", error);
+                        setTestGameId("");
+                        await handleFullRefresh();
+                      } else {
                         toaster.toast({
-                            title: "Error",
-                            body: "Failed to clear test game",
-                            critical: true
+                          title: "Error",
+                          body: "Failed to clear test game",
+                          critical: true
                         });
-                        }
-                    }}
-                    >
-                    Clear Test Game (Return to Normal Detection)
-                    </ButtonItem>
-                </PanelSectionRow>
-                
-                <PanelSectionRow>
-                    <div style={{ fontSize: "11px", opacity: 0.6 }}>
-                    Examples: 730 (CS:GO), 570 (Dota 2), 440 (TF2)
-                    <br />
-                    Test mode overrides automatic game detection
-                    </div>
-                </PanelSectionRow>
-                </PanelSection>
+                      }
+                    } catch (error) {
+                      console.error("Failed to clear test game:", error);
+                      toaster.toast({
+                        title: "Error",
+                        body: "Failed to clear test game",
+                        critical: true
+                      });
+                    }
+                  }}
+                >
+                  Clear Test Game
+                </ButtonItem>
+              </PanelSectionRow>
+              
+              <PanelSectionRow>
+                <div style={{ fontSize: "11px", opacity: 0.6 }}>
+                  Examples: 730 (CS:GO), 570 (Dota 2), 440 (TF2)
+                </div>
+              </PanelSectionRow>
+            </PanelSection>
             
             <PanelSection title="Auto Refresh">
               <PanelSectionRow>
@@ -1077,10 +1146,10 @@ function Content() {
                     onClick={() => {
                       showContextMenu(
                         <Menu label="Refresh Interval">
-                          <MenuItem onSelected={() => setRefreshInterval(15)}>15 seconds</MenuItem>
-                          <MenuItem onSelected={() => setRefreshInterval(30)}>30 seconds</MenuItem>
-                          <MenuItem onSelected={() => setRefreshInterval(60)}>1 minute</MenuItem>
-                          <MenuItem onSelected={() => setRefreshInterval(300)}>5 minutes</MenuItem>
+                          <MenuItem onClick={() => setRefreshInterval(15)}>15 seconds</MenuItem>
+                          <MenuItem onClick={() => setRefreshInterval(30)}>30 seconds</MenuItem>
+                          <MenuItem onClick={() => setRefreshInterval(60)}>1 minute</MenuItem>
+                          <MenuItem onClick={() => setRefreshInterval(300)}>5 minutes</MenuItem>
                         </Menu>
                       );
                     }}
@@ -1221,7 +1290,7 @@ const styles = `
 
 // Plugin definition
 export default definePlugin(() => {
-  console.log("Steam Achievement Tracker initializing");
+  console.log("SDAchievement initializing");
   
   // Inject styles
   const styleElement = document.createElement("style");
@@ -1229,12 +1298,12 @@ export default definePlugin(() => {
   document.head.appendChild(styleElement);
 
   return {
-    name: "Steam Achievement Tracker",
-    titleView: <div className={staticClasses.Title}>Achievement Tracker</div>,
+    name: "SDAchievement",
+    titleView: <div className={staticClasses.Title}>SDAchievement</div>,
     content: <Content />,
     icon: <FaTrophy />,
     onDismount() {
-      console.log("Steam Achievement Tracker unloading");
+      console.log("SDAchievement unloading");
       styleElement.remove();
     },
   };
