@@ -20,8 +20,9 @@ import {
   definePlugin,
   toaster
 } from "@decky/api";
-import { useState, useEffect, useCallback, VFC } from "react";
-import { FaTrophy, FaGamepad, FaClock, FaStar, FaSync, FaKey, FaCheck, FaLock, FaPercent, FaChartLine, FaUser, FaList, FaEye } from "react-icons/fa";
+import { useState, useEffect, useCallback, VFC, useRef } from "react";
+import { FaTrophy, FaGamepad, FaClock, FaStar, FaSync, FaKey, FaCheck, FaLock, FaChartLine, FaList, FaEye } from "react-icons/fa";
+import { GameInfo, GameInfoCard } from "./components/GameInfoCard";
 
 // Type definitions
 interface Achievement {
@@ -45,14 +46,7 @@ interface AchievementData {
   error?: string;
 }
 
-interface GameInfo {
-  app_id: number;
-  name: string;
-  is_running: boolean;
-  has_achievements: boolean;
-  achievement_count: number;
-  header_image?: string;
-}
+
 
 interface GameStats {
   app_id: number;
@@ -82,11 +76,7 @@ interface OverallProgress {
   total_achievements: number;
   unlocked_achievements: number;
   average_completion: number;
-  perfect_games: Array<{
-    name: string;
-    app_id: number;
-    achievements: number;
-  }>;
+  perfect_games: Array<GameInfo>;
   perfect_games_count: number;
   error?: string;
 }
@@ -115,8 +105,10 @@ const setTestGame = callable<[app_id: number], boolean>("set_test_game");
 const loadSettings = callable<[], any>("load_settings");
 const refreshCache = callable<[app_id?: number], boolean>("refresh_cache");
 const clearTestGame = callable<[], boolean>("clear_test_game");
-const getSettings = callable<[], any>("get_settings");
+// const getSettings = callable<[], any>("get_settings");
 const reloadSettings = callable<[], any>("reload_settings");
+const saveRefreshIntervalBackend = callable<[interval: number], boolean>("set_refresh_interval");
+
 
 // Game Selection Modal
 const GameSelectionModal: VFC<{ 
@@ -169,6 +161,48 @@ const GameSelectionModal: VFC<{
     </ConfirmModal>
   );
 };
+
+// When you want to show the game info modal, do:
+const openGameInfoModal = async (game: GameInfo) => {
+  // Optionally fetch achievements for the game, if not already available
+  let achs: Achievement[] | undefined = undefined;
+  try {
+    const result = await getAchievements(game.app_id);
+    if (result && !result.error) {
+      achs = result.achievements;
+    }
+  } catch (e) {
+    achs = undefined;
+  }
+
+  showModal(
+    <ConfirmModal
+      strTitle={game.name}
+      onOK={() => {}}
+      strOKButtonText="Close"
+    >
+      <GameInfoCard
+        game={game}
+        rarestAchievement={getRarestAchievement(achs)}
+      />
+    </ConfirmModal>
+  );
+};
+
+// Example: To get the rarest achievement for a game's achievements list:
+function getRarestAchievement(achievements?: Achievement[]): Achievement | null {
+  if (!achievements || achievements.length === 0) return null;
+  return achievements.reduce((prev, curr) => {
+    if (
+      curr.global_percent !== null &&
+      !isNaN(curr.global_percent) &&
+      (prev.global_percent === null || curr.global_percent < prev.global_percent)
+    ) {
+      return curr;
+    }
+    return prev;
+  });
+}
 
 // Achievement Details Modal
 const AchievementDetailsModal: VFC<{
@@ -285,6 +319,61 @@ function Content() {
   const [loadingMessage, setLoadingMessage] = useState("");
   const [trackedGame, setTrackedGame] = useState<TrackedGame | null>(null);
   const [trackedGameAchievements, setTrackedGameAchievements] = useState<AchievementData | null>(null);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const saveAutoRefreshBackend = callable<[enabled: boolean], boolean>("set_auto_refresh");
+
+  const saveRefreshInterval = useCallback(async (interval: number) => {
+
+    if (interval === lastSavedInterval.current) {
+        setRefreshInterval(interval);
+        return;
+    }
+
+    try {
+        // Update local state immediately for responsive UI
+        setRefreshInterval(interval);
+        
+        // Try to save to backend if the function exists
+        try {
+            const success = await saveRefreshIntervalBackend (interval);
+            if (success) {
+                toaster.toast({
+                title: "Refresh Interval Updated",
+                body: `Auto-refresh set to ${interval < 60 ? `${interval} seconds` : `${interval / 60} minutes`}`
+                });
+            }
+            } catch (backendError) {
+            // If backend doesn't have this function yet, just show success anyway
+            // The state is already updated locally
+            console.log("Backend save not available, using local state only");
+        }
+    } catch (error) {
+        console.error("Failed to save refresh interval:", error);
+    }
+  }, []);
+
+  const saveAutoRefresh = useCallback(async (enabled: boolean) => {
+    try {
+      // Update local state immediately
+      setAutoRefresh(enabled);
+      
+      // Try to save to backend
+      try {
+        const success = await saveAutoRefreshBackend(enabled);
+        if (success) {
+          toaster.toast({
+            title: "Auto-Refresh Updated",
+            body: enabled ? "Auto-refresh enabled" : "Auto-refresh disabled"
+          });
+        }
+      } catch (backendError) {
+        console.log("Backend save not available for auto-refresh, using local state only:", backendError);
+        // Still update locally even if backend fails
+      }
+    } catch (error) {
+      console.error("Failed to save auto-refresh setting:", error);
+    }
+  }, []);
 
   // Fetch current game
   const fetchCurrentGame = useCallback(async () => {
@@ -409,11 +498,6 @@ function Content() {
       }
     } catch (error) {
       console.error("Failed to load settings:", error);
-      toaster.toast({
-        title: "Error",
-        body: "Failed to load settings",
-        critical: true
-      });
     }
   }, []);
 
@@ -512,9 +596,14 @@ function Content() {
     }
   }, [currentTab, fetchCurrentGame, fetchAchievements, fetchGameStats, fetchRecentAchievements, fetchOverallProgress]);
 
+  const lastSavedInterval = useRef(30);
+  
   // Initial load
   useEffect(() => {
-    loadPluginSettings();
+    loadPluginSettings().then(() => {
+        // Set the initial saved interval value
+        lastSavedInterval.current = refreshInterval;
+    });
     handleFullRefresh();
   }, []);
 
@@ -530,8 +619,13 @@ function Content() {
       fetchOverallProgress();
     } else if (currentTab === Tab.SETTINGS) {
       loadPluginSettings();
+    } else if (currentTab === Tab.CURRENT_GAME) {
+        if (!settingsLoaded) {
+            loadPluginSettings();
+            setSettingsLoaded(true);
+        }
     }
-  }, [currentTab, recentSubTab]);
+  }, [currentTab, recentSubTab, trackedGame]);
 
   // Auto-refresh
   useEffect(() => {
@@ -761,7 +855,7 @@ function Content() {
                         opacity: 0.9,
                         textShadow: "1px 1px 1px rgba(0,0,0,0.5)"
                       }}>
-                        {currentGame.achievement_count} achievements available
+                        {currentGame.achievements} achievements available
                       </div>
                     )}
                   </div>
@@ -976,26 +1070,26 @@ function Content() {
                 <DialogButton
                   style={{ 
                     flex: 1,
-                    padding: "6px",
+                    minWidth: "60px",
                     fontSize: "12px",
                     backgroundColor: recentSubTab === RecentSubTab.ALL ? "rgba(255,255,255,0.15)" : "transparent"
                   }}
                   onClick={() => setRecentSubTab(RecentSubTab.ALL)}
                 >
                   <FaList size={14} style={{ marginRight: "4px" }} />
-                  All Recent
+                  Recent
                 </DialogButton>
                 <DialogButton
                   style={{ 
                     flex: 1,
-                    padding: "6px",
+                    minWidth: "60px",
                     fontSize: "12px",
                     backgroundColor: recentSubTab === RecentSubTab.TRACKED ? "rgba(255,255,255,0.15)" : "transparent"
                   }}
                   onClick={() => setRecentSubTab(RecentSubTab.TRACKED)}
                 >
                   <FaEye size={14} style={{ marginRight: "4px" }} />
-                  Tracked Game
+                  Tracked
                 </DialogButton>
               </Focusable>
             </PanelSection>
@@ -1023,7 +1117,9 @@ function Content() {
                           <ButtonItem
                             layout="below"
                             onClick={() => {
-                              Navigation.NavigateToSteamWeb(`https://store.steampowered.com/app/${ach.game_id}`);
+                                // navigateToLibraryApp(Number("${ach.game_id}"));
+                                //Navigation.CloseSideMenus();
+                                Navigation.NavigateToSteamWeb(`https://store.steampowered.com/app/${ach.game_id}`);
                             }}
                           >
                             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -1181,51 +1277,238 @@ function Content() {
         );
 
       case Tab.OVERALL:
+        // Calculate additional statistics from the data
+        const getCompletionStats = () => {
+          if (!overallProgress || overallProgress.error) return null;
+          
+          // Games actually started (with at least 1 achievement)
+          const gamesStarted = overallProgress.games_with_achievements;
+          
+          // Average completion per game (only counting games with achievements)
+          const avgPerGame = gamesStarted > 0 
+            ? Math.round((overallProgress.unlocked_achievements / overallProgress.total_achievements * 100) * 10) / 10
+            : 0;
+          
+          // Completion rate brackets
+          const nearPerfect = overallProgress.perfect_games?.filter(g => {
+            // This would need backend support to get games 90-99% complete
+            // For now we only have perfect games
+            return false;
+          }).length || 0;
+          
+          // Achievement unlock rate
+          const unlockRate = overallProgress.total_achievements > 0
+            ? Math.round((overallProgress.unlocked_achievements / overallProgress.total_achievements * 100) * 10) / 10
+            : 0;
+          
+          // Achievements remaining
+          const remaining = overallProgress.total_achievements - overallProgress.unlocked_achievements;
+          
+          // Average achievements per game
+          const avgAchievementsPerGame = gamesStarted > 0
+            ? Math.round(overallProgress.total_achievements / gamesStarted)
+            : 0;
+          
+          return {
+            gamesStarted,
+            avgPerGame,
+            nearPerfect,
+            unlockRate,
+            remaining,
+            avgAchievementsPerGame
+          };
+        };
+        
+        const stats = getCompletionStats();
+        
         return (
           <>
             <PanelSection title="Overall Progress">
               {overallProgress && !overallProgress.error ? (
                 <>
-                  <PanelSectionRow>
-                    <div style={{ display: "flex", justifyContent: "space-between" }}>
-                      <span>Total Games</span>
-                      <span style={{ fontWeight: "bold" }}>{overallProgress.total_games || 0}</span>
-                    </div>
-                  </PanelSectionRow>
-                  
-                  <PanelSectionRow>
-                    <div style={{ display: "flex", justifyContent: "space-between" }}>
-                      <span>Games with Achievements</span>
-                      <span style={{ fontWeight: "bold" }}>{overallProgress.games_with_achievements || 0}</span>
-                    </div>
-                  </PanelSectionRow>
-                  
+                  {/* Main Progress Bar */}
                   <PanelSectionRow>
                     <ProgressBarWithInfo
                       nProgress={calculateProgress(overallProgress.unlocked_achievements, overallProgress.total_achievements)}
-                      sOperationText={formatProgressText(overallProgress.unlocked_achievements, overallProgress.total_achievements, true)}
+                      sOperationText={`${overallProgress.unlocked_achievements.toLocaleString()} / ${overallProgress.total_achievements.toLocaleString()} achievements`}
                       nTransitionSec={0.3}
                     />
                   </PanelSectionRow>
                   
+                  {/* Key Statistics Grid */}
                   <PanelSectionRow>
-                    <div style={{ display: "flex", justifyContent: "space-between" }}>
-                      <span>Average Completion</span>
-                      <span style={{ fontWeight: "bold" }}>{Number(overallProgress.average_completion) || 0}%</span>
+                    <div style={{ 
+                      display: "grid", 
+                      gridTemplateColumns: "1fr 1fr", 
+                      gap: "12px",
+                      marginTop: "8px"
+                    }}>
+                      {/* Games Started */}
+                      <div style={{ 
+                        backgroundColor: "rgba(255,255,255,0.05)",
+                        padding: "10px",
+                        borderRadius: "4px"
+                      }}>
+                        <div style={{ fontSize: "11px", opacity: 0.7, marginBottom: "4px" }}>
+                          Games Started
+                        </div>
+                        <div style={{ fontSize: "18px", fontWeight: "bold" }}>
+                          {stats?.gamesStarted || 0}
+                        </div>
+                        <div style={{ fontSize: "10px", opacity: 0.5 }}>
+                          of {overallProgress.total_games} owned
+                        </div>
+                      </div>
+                      
+                      {/* Perfect Games */}
+                      <div style={{ 
+                        backgroundColor: "rgba(255,215,0,0.1)",
+                        padding: "10px",
+                        borderRadius: "4px"
+                      }}>
+                        <div style={{ fontSize: "11px", opacity: 0.7, marginBottom: "4px" }}>
+                          Perfect Games
+                        </div>
+                        <div style={{ fontSize: "18px", fontWeight: "bold", color: "#FFD700" }}>
+                          {overallProgress.perfect_games_count || 0}
+                        </div>
+                        <div style={{ fontSize: "10px", opacity: 0.5 }}>
+                          100% completed
+                        </div>
+                      </div>
                     </div>
                   </PanelSectionRow>
                   
+                  {/* Detailed Stats */}
                   <PanelSectionRow>
-                    <div style={{ display: "flex", justifyContent: "space-between" }}>
-                      <span>Perfect Games</span>
-                      <span style={{ fontWeight: "bold" }}>{overallProgress.perfect_games_count || 0}</span>
+                    <div style={{ marginTop: "8px" }}>
+                      {/* Overall Unlock Rate */}
+                      <div style={{ 
+                        display: "flex", 
+                        justifyContent: "space-between",
+                        padding: "6px 0",
+                        borderBottom: "1px solid rgba(255,255,255,0.1)"
+                      }}>
+                        <span style={{ fontSize: "13px", opacity: 0.8 }}>
+                          🏆 Overall Completion
+                        </span>
+                        <span style={{ fontWeight: "bold", fontSize: "13px" }}>
+                          {stats?.unlockRate || 0}%
+                        </span>
+                      </div>
+                      
+                      {/* Average Per Game (only started games) */}
+                      <div style={{ 
+                        display: "flex", 
+                        justifyContent: "space-between",
+                        padding: "6px 0",
+                        borderBottom: "1px solid rgba(255,255,255,0.1)"
+                      }}>
+                        <span style={{ fontSize: "13px", opacity: 0.8 }}>
+                          📊 Avg per Started Game
+                        </span>
+                        <span style={{ fontWeight: "bold", fontSize: "13px" }}>
+                          {overallProgress.average_completion || 0}%
+                        </span>
+                      </div>
+                      
+                      {/* Achievements Remaining */}
+                      <div style={{ 
+                        display: "flex", 
+                        justifyContent: "space-between",
+                        padding: "6px 0",
+                        borderBottom: "1px solid rgba(255,255,255,0.1)"
+                      }}>
+                        <span style={{ fontSize: "13px", opacity: 0.8 }}>
+                          🎯 Achievements Left
+                        </span>
+                        <span style={{ fontWeight: "bold", fontSize: "13px" }}>
+                          {stats?.remaining.toLocaleString() || 0}
+                        </span>
+                      </div>
+                      
+                      {/* Average Achievements per Game */}
+                      <div style={{ 
+                        display: "flex", 
+                        justifyContent: "space-between",
+                        padding: "6px 0"
+                      }}>
+                        <span style={{ fontSize: "13px", opacity: 0.8 }}>
+                          📈 Avg per Game
+                        </span>
+                        <span style={{ fontWeight: "bold", fontSize: "13px" }}>
+                          {stats?.avgAchievementsPerGame || 0} achievements
+                        </span>
+                      </div>
                     </div>
                   </PanelSectionRow>
+                  
+                  {/* Completion Milestones */}
+                  {(overallProgress.unlocked_achievements > 0) && (
+                    <PanelSectionRow>
+                      <div style={{
+                        marginTop: "12px",
+                        padding: "10px",
+                        backgroundColor: "rgba(76, 175, 80, 0.1)",
+                        borderRadius: "4px",
+                        borderLeft: "3px solid #4CAF50"
+                      }}>
+                        <div style={{ fontSize: "11px", opacity: 0.7, marginBottom: "4px" }}>
+                          🎉 Milestone Progress
+                        </div>
+                        <div style={{ fontSize: "13px" }}>
+                          {overallProgress.unlocked_achievements >= 10000 ? (
+                            <span>🏅 Legendary Hunter - {overallProgress.unlocked_achievements.toLocaleString()} achievements!</span>
+                          ) : overallProgress.unlocked_achievements >= 5000 ? (
+                            <span>💎 Master Collector - {overallProgress.unlocked_achievements.toLocaleString()} achievements!</span>
+                          ) : overallProgress.unlocked_achievements >= 1000 ? (
+                            <span>⭐ Achievement Expert - {overallProgress.unlocked_achievements.toLocaleString()} achievements!</span>
+                          ) : overallProgress.unlocked_achievements >= 500 ? (
+                            <span>🌟 Rising Star - {overallProgress.unlocked_achievements.toLocaleString()} achievements!</span>
+                          ) : overallProgress.unlocked_achievements >= 100 ? (
+                            <span>✨ Getting Started - {overallProgress.unlocked_achievements.toLocaleString()} achievements!</span>
+                          ) : (
+                            <span>🌱 Beginner - Keep going!</span>
+                          )}
+                        </div>
+                        <div style={{ 
+                          fontSize: "10px", 
+                          opacity: 0.6, 
+                          marginTop: "4px" 
+                        }}>
+                          Next: {
+                            overallProgress.unlocked_achievements < 100 ? `${100 - overallProgress.unlocked_achievements} to reach 100` :
+                            overallProgress.unlocked_achievements < 500 ? `${500 - overallProgress.unlocked_achievements} to reach 500` :
+                            overallProgress.unlocked_achievements < 1000 ? `${1000 - overallProgress.unlocked_achievements} to reach 1,000` :
+                            overallProgress.unlocked_achievements < 5000 ? `${5000 - overallProgress.unlocked_achievements} to reach 5,000` :
+                            overallProgress.unlocked_achievements < 10000 ? `${10000 - overallProgress.unlocked_achievements} to reach 10,000` :
+                            "You're a legend!"
+                          }
+                        </div>
+                      </div>
+                    </PanelSectionRow>
+                  )}
                 </>
               ) : (
                 <PanelSectionRow>
-                  <div style={{ opacity: 0.6 }}>
-                    {isLoading ? "Calculating overall progress..." : "Click below to calculate progress"}
+                  <div style={{ opacity: 0.6, textAlign: "center", padding: "20px" }}>
+                    {isLoading ? (
+                      <>
+                        <FaSync className="spinning" style={{ fontSize: "24px", marginBottom: "8px" }} />
+                        <div>Calculating overall progress...</div>
+                        <div style={{ fontSize: "11px", marginTop: "4px" }}>
+                          This may take a moment for large libraries
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <FaChartLine style={{ fontSize: "24px", marginBottom: "8px", opacity: 0.5 }} />
+                        <div>No progress data available</div>
+                        <div style={{ fontSize: "11px", marginTop: "4px" }}>
+                          Click below to calculate your achievement progress
+                        </div>
+                      </>
+                    )}
                   </div>
                 </PanelSectionRow>
               )}
@@ -1238,12 +1521,13 @@ function Content() {
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                     <FaSync className={isLoading ? "spinning" : ""} />
-                    Calculate Progress
+                    {isLoading ? "Calculating..." : "Calculate Progress"}
                   </div>
                 </ButtonItem>
               </PanelSectionRow>
             </PanelSection>
             
+            {/* Perfect Games Section */}
             {overallProgress?.perfect_games && overallProgress.perfect_games.length > 0 && (
               <PanelSection title="Perfect Games">
                 <div style={{ maxHeight: "300px", overflowY: "auto", overflowX: "hidden" }}>
@@ -1252,16 +1536,7 @@ function Content() {
                       <PanelSectionRow key={game.app_id}>
                         <ButtonItem
                           layout="below"
-                          onClick={() => {
-                            showModal(
-                              <ConfirmModal
-                                strTitle={game.name}
-                                strDescription={`${game.achievements} achievements completed (100%)`}
-                                onOK={() => Navigation.NavigateToSteamWeb(`https://store.steampowered.com/app/${game.app_id}`)}
-                                strOKButtonText="View in Steam"
-                              />
-                            );
-                          }}
+                          onClick={() => openGameInfoModal(game)}
                         >
                           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                             <FaTrophy style={{ color: "#FFD700" }} />
@@ -1422,7 +1697,7 @@ function Content() {
                   label="Enable auto-refresh"
                   description="Update achievements automatically"
                   checked={autoRefresh}
-                  onChange={setAutoRefresh}
+                  onChange={saveAutoRefresh}
                 />
               </PanelSectionRow>
               
@@ -1433,10 +1708,10 @@ function Content() {
                     onClick={() => {
                       showContextMenu(
                         <Menu label="Refresh Interval">
-                          <MenuItem onClick={() => setRefreshInterval(15)}>15 seconds</MenuItem>
-                          <MenuItem onClick={() => setRefreshInterval(30)}>30 seconds</MenuItem>
-                          <MenuItem onClick={() => setRefreshInterval(60)}>1 minute</MenuItem>
-                          <MenuItem onClick={() => setRefreshInterval(300)}>5 minutes</MenuItem>
+                          <MenuItem onClick={() => saveRefreshInterval(15)}>15 seconds</MenuItem>
+                          <MenuItem onClick={() => saveRefreshInterval(30)}>30 seconds</MenuItem>
+                          <MenuItem onClick={() => saveRefreshInterval(60)}>1 minute</MenuItem>
+                          <MenuItem onClick={() => saveRefreshInterval(300)}>5 minutes</MenuItem>
                         </Menu>
                       );
                     }}
@@ -1474,9 +1749,13 @@ function Content() {
                       if (reloaded && !reloaded.error) {
                         setApiKeySet(!!reloaded.api_key_set);
                         setSteamUserIdState(reloaded.steam_user_id || "");
+                        setAutoRefresh(reloaded.auto_refresh ?? true);
+                        setRefreshInterval(reloaded.refresh_interval ?? 30);
+                        lastSavedInterval.current = reloaded.refresh_interval ?? 30; 
                         if (reloaded.test_app_id) {
                           setTestGameId(reloaded.test_app_id.toString());
                         }
+                        setSettingsLoaded(false);
                         toaster.toast({
                           title: "Settings Reloaded",
                           body: "Settings have been reloaded from disk"

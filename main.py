@@ -121,14 +121,16 @@ class Plugin:
             self.steam_api_key = self.settings_service.api_key
             self.current_user_id = self.settings_service.user_id
             self.test_app_id = self.settings_service.test_app_id
+
+            refresh_interval = self.settings_service.settings.get('refresh_interval', 30) if self.settings_service.settings else 30
             
             # Return settings for UI
             return {
                 "steam_api_key": self.steam_api_key or "",
                 "steam_user_id": self.current_user_id or "",
                 "test_app_id": self.test_app_id,
-                "auto_refresh": True,  # You can add these to settings service if needed
-                "refresh_interval": 30
+                "auto_refresh": self.settings_service.settings.get('auto_refresh', True) if self.settings_service.settings else True,# You can add these to settings service if needed
+                "refresh_interval": refresh_interval
             }
         except Exception as e:
             decky.logger.error(f"Failed to load settings: {e}")
@@ -137,14 +139,17 @@ class Plugin:
     async def get_settings(self) -> Dict:
         """Get current settings without reloading from disk"""
         try:
+            refresh_interval = self.settings_service.settings.get('refresh_interval', 30) if self.settings_service.settings else 30
+            auto_refresh = self.settings_service.settings.get('auto_refresh', True) if self.settings_service.settings else True
+
             return {
                 "steam_api_key": self.settings_service.api_key or "",
                 "steam_user_id": self.settings_service.user_id or "",
                 "test_app_id": self.settings_service.test_app_id,
                 "api_key_set": bool(self.settings_service.api_key),
                 "user_id_set": bool(self.settings_service.user_id),
-                "auto_refresh": True,
-                "refresh_interval": 30
+                "auto_refresh": auto_refresh,
+                "refresh_interval": refresh_interval
             }
         except Exception as e:
             decky.logger.error(f"Failed to get settings: {e}")
@@ -170,11 +175,44 @@ class Plugin:
             decky.logger.info(f"Settings reloaded - API Key: {bool(self.steam_api_key)}, User ID: {self.current_user_id}")
             
             # Return the current settings for UI
-            return await self.get_settings()
+            refresh_interval = self.settings_service.settings.get('refresh_interval', 30) if self.settings_service.settings else 30
+            auto_refresh = self.settings_service.settings.get('auto_refresh', True) if self.settings_service.settings else True
             
+            return {
+                "steam_api_key": self.settings_service.api_key or "",
+                "steam_user_id": self.settings_service.user_id or "",
+                "test_app_id": self.settings_service.test_app_id,
+                "api_key_set": bool(self.settings_service.api_key),
+                "user_id_set": bool(self.settings_service.user_id),
+                "auto_refresh": auto_refresh,
+                "refresh_interval": refresh_interval
+            }
+                
         except Exception as e:
             decky.logger.error(f"Failed to reload settings: {e}")
             return {"error": str(e)}
+        
+    async def set_auto_refresh(self, enabled: bool) -> bool:
+        """Set and save the auto-refresh enabled state"""
+        try:
+            decky.logger.info(f"Setting auto-refresh to {enabled}")
+            
+            # Get the current settings from the service's internal state
+            current_settings = self.settings_service.settings.copy() if self.settings_service.settings else {}
+            
+            # Update auto_refresh
+            current_settings['auto_refresh'] = enabled
+            
+            # Save settings using the service
+            success = await self.settings_service.save(current_settings)
+            
+            if success:
+                decky.logger.info(f"Auto-refresh setting saved: {enabled}")
+            
+            return success
+        except Exception as e:
+            decky.logger.error(f"Failed to set auto-refresh: {e}")
+            return False
     
     async def set_steam_api_key(self, api_key: str) -> bool:
         """Set Steam API key"""
@@ -200,6 +238,30 @@ class Plugin:
             return success
         except Exception as e:
             decky.logger.error(f"Failed to set user ID: {e}")
+            return False
+
+    async def set_refresh_interval(self, interval: int) -> bool:
+        """Set and save the auto-refresh interval"""
+        try:
+            decky.logger.info(f"Setting refresh interval to {interval} seconds")
+            
+            # Get the current settings from the service's internal state
+            current_settings = self.settings_service.settings.copy() if self.settings_service.settings else {}
+            
+            # Update refresh interval
+            current_settings['refresh_interval'] = interval
+            
+            # Save settings using the service
+            success = await self.settings_service.save(current_settings)
+            
+            if success:
+                decky.logger.info(f"Refresh interval saved: {interval} seconds")
+            else:
+                decky.logger.error("Failed to save refresh interval")
+            
+            return success
+        except Exception as e:
+            decky.logger.error(f"Failed to set refresh interval: {e}")
             return False
     
     async def set_test_game(self, app_id: int) -> bool:
