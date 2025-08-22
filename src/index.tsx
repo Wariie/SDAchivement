@@ -11,15 +11,17 @@ import {
   Focusable,
   Menu,
   MenuItem,
-  showContextMenu
+  showContextMenu,
+  showModal,
+  ConfirmModal
 } from "@decky/ui";
 import {
   callable,
   definePlugin,
   toaster
 } from "@decky/api";
-import { useState, useEffect, useCallback } from "react";
-import { FaTrophy, FaGamepad, FaClock, FaStar, FaSync, FaKey, FaCheck, FaLock, FaPercent, FaChartLine, FaUser } from "react-icons/fa";
+import { useState, useEffect, useCallback, VFC } from "react";
+import { FaTrophy, FaGamepad, FaClock, FaStar, FaSync, FaKey, FaCheck, FaLock, FaPercent, FaChartLine, FaUser, FaList, FaEye } from "react-icons/fa";
 
 // Type definitions
 interface Achievement {
@@ -58,6 +60,12 @@ interface GameStats {
   error?: string;
 }
 
+interface TrackedGame {
+  app_id: number;
+  name: string;
+  last_checked?: number;
+}
+
 interface RecentAchievement {
   game_name: string;
   game_id: number;
@@ -91,6 +99,11 @@ enum Tab {
   SETTINGS = "settings"
 }
 
+enum RecentSubTab {
+  ALL = "all",
+  TRACKED = "tracked"
+}
+
 // Python backend callable functions
 const getCurrentGame = callable<[], GameInfo | null>("get_current_game");
 const getAchievements = callable<[app_id?: number], AchievementData>("get_achievements");
@@ -102,6 +115,121 @@ const setTestGame = callable<[app_id: number], boolean>("set_test_game");
 const loadSettings = callable<[], any>("load_settings");
 const refreshCache = callable<[app_id?: number], boolean>("refresh_cache");
 const clearTestGame = callable<[], boolean>("clear_test_game");
+const getSettings = callable<[], any>("get_settings");
+const reloadSettings = callable<[], any>("reload_settings");
+
+// Game Selection Modal
+const GameSelectionModal: VFC<{ 
+  games: Array<{ app_id: number; name: string }>;
+  onSelect: (game: { app_id: number; name: string }) => void;
+  closeModal?: () => void;
+}> = ({ games, onSelect, closeModal }) => {
+  const [searchTerm, setSearchTerm] = useState("");
+  
+  const filteredGames = games.filter(game => 
+    game.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+  
+  return (
+    <ConfirmModal
+      strTitle="Select Game to Track"
+      strDescription="Choose a game to track recent achievements"
+      onCancel={closeModal}
+      onOK={closeModal}
+      strOKButtonText="Close"
+    >
+      <PanelSection>
+        <TextField
+          label="Search Games"
+          value={searchTerm}
+          onChange={(e: any) => setSearchTerm(e.target.value)}
+        />
+      </PanelSection>
+      
+      <div style={{ 
+        maxHeight: "300px", 
+        overflowY: "auto",
+        marginTop: "10px"
+      }}>
+        <Focusable>
+          {filteredGames.slice(0, 50).map((game) => (
+            <ButtonItem
+              key={game.app_id}
+              layout="below"
+              onClick={() => {
+                onSelect(game);
+                closeModal?.();
+              }}
+            >
+              {game.name}
+            </ButtonItem>
+          ))}
+        </Focusable>
+      </div>
+    </ConfirmModal>
+  );
+};
+
+// Achievement Details Modal
+const AchievementDetailsModal: VFC<{
+  achievement: Achievement;
+  closeModal?: () => void;
+}> = ({ achievement, closeModal }) => {
+  const formatTime = (timestamp: number): string => {
+    const date = new Date(timestamp * 1000);
+    return date.toLocaleDateString() + " " + date.toLocaleTimeString();
+  };
+
+  return (
+    <ConfirmModal
+      strTitle={achievement.display_name}
+      onOK={closeModal}
+      strOKButtonText="Close"
+      bHideCloseIcon={false}
+    >
+      <div style={{ padding: "10px" }}>
+        {achievement.icon && (
+          <div style={{ textAlign: "center", marginBottom: "15px" }}>
+            <img 
+              src={achievement.unlocked ? achievement.icon : achievement.icon_gray} 
+              style={{ width: "64px", height: "64px", borderRadius: "8px" }}
+              alt=""
+            />
+          </div>
+        )}
+        
+        <div style={{ marginBottom: "10px" }}>
+          <strong>Description:</strong><br />
+          {!achievement.hidden || achievement.unlocked 
+            ? achievement.description 
+            : "Hidden achievement"}
+        </div>
+        
+        {achievement.global_percent !== null && !isNaN(achievement.global_percent) && (
+          <div style={{ marginBottom: "10px" }}>
+            <strong>Rarity:</strong> {achievement.global_percent.toFixed(1)}% of players
+          </div>
+        )}
+        
+        {achievement.unlocked && achievement.unlock_time && (
+          <div style={{ marginBottom: "10px" }}>
+            <strong>Unlocked:</strong> {formatTime(achievement.unlock_time)}
+          </div>
+        )}
+        
+        <div style={{ 
+          marginTop: "15px",
+          padding: "10px",
+          backgroundColor: achievement.unlocked ? "rgba(76, 175, 80, 0.1)" : "rgba(255, 255, 255, 0.05)",
+          borderRadius: "4px",
+          textAlign: "center"
+        }}>
+          {achievement.unlocked ? "✓ Unlocked" : "🔒 Locked"}
+        </div>
+      </div>
+    </ConfirmModal>
+  );
+};
 
 function formatGlobalPercent(percent: any): string {
   if (percent === null || percent === undefined || isNaN(percent)) {
@@ -118,8 +246,8 @@ function calculateProgress(unlocked: any, total: any) {
     return 0;
   }
   
-  const progress = unlockedNum / totalNum;
-  return Math.max(0, Math.min(1, progress));
+  const progress = Math.round(unlockedNum / totalNum * 100);
+  return progress;
 }
 
 function formatProgressText(unlocked: any, total: any, showPercentage = false) {
@@ -138,6 +266,7 @@ function formatProgressText(unlocked: any, total: any, showPercentage = false) {
 function Content() {
   // State management
   const [currentTab, setCurrentTab] = useState<Tab>(Tab.CURRENT_GAME);
+  const [recentSubTab, setRecentSubTab] = useState<RecentSubTab>(RecentSubTab.ALL);
   const [currentGame, setCurrentGame] = useState<GameInfo | null>(null);
   const [achievements, setAchievements] = useState<AchievementData | null>(null);
   const [gameStats, setGameStats] = useState<GameStats | null>(null);
@@ -154,6 +283,8 @@ function Content() {
   const [testGameId, setTestGameId] = useState("");
   const [steamUserId, setSteamUserIdState] = useState("");
   const [loadingMessage, setLoadingMessage] = useState("");
+  const [trackedGame, setTrackedGame] = useState<TrackedGame | null>(null);
+  const [trackedGameAchievements, setTrackedGameAchievements] = useState<AchievementData | null>(null);
 
   // Fetch current game
   const fetchCurrentGame = useCallback(async () => {
@@ -210,6 +341,25 @@ function Content() {
     }
   }, []);
 
+  // Fetch tracked game achievements
+  const fetchTrackedGameAchievements = useCallback(async () => {
+    if (!trackedGame) return;
+    
+    setIsLoading(true);
+    setLoadingMessage(`Loading achievements for ${trackedGame.name}...`);
+    try {
+      const result = await getAchievements(trackedGame.app_id);
+      if (result && !result.error) {
+        setTrackedGameAchievements(result);
+      }
+    } catch (error) {
+      console.error("Failed to fetch tracked game achievements:", error);
+    } finally {
+      setIsLoading(false);
+      setLoadingMessage("");
+    }
+  }, [trackedGame]);
+
   // Fetch recent achievements
   const fetchRecentAchievements = useCallback(async () => {
     setIsLoading(true);
@@ -253,9 +403,17 @@ function Content() {
         setSteamUserIdState(result.steam_user_id || "");
         setAutoRefresh(result.auto_refresh ?? true);
         setRefreshInterval(result.refresh_interval ?? 30);
+        if (result.test_app_id) {
+          setTestGameId(result.test_app_id.toString());
+        }
       }
     } catch (error) {
       console.error("Failed to load settings:", error);
+      toaster.toast({
+        title: "Error",
+        body: "Failed to load settings",
+        critical: true
+      });
     }
   }, []);
 
@@ -265,6 +423,10 @@ function Content() {
       const success = await setSteamApiKey(steamApiKey);
       if (success) {
         setApiKeySet(true);
+        const reloaded = await loadSettings();
+        if (reloaded) {
+          setSteamUserIdState(reloaded.steam_user_id || "");
+        }
         toaster.toast({
           title: "Success",
           body: "Steam API key saved successfully!"
@@ -358,12 +520,18 @@ function Content() {
 
   // Tab change handler
   useEffect(() => {
-    if (currentTab === Tab.RECENT && recentAchievements.length === 0) {
-      fetchRecentAchievements();
+    if (currentTab === Tab.RECENT) {
+      if (recentSubTab === RecentSubTab.ALL && recentAchievements.length === 0) {
+        fetchRecentAchievements();
+      } else if (recentSubTab === RecentSubTab.TRACKED && trackedGame) {
+        fetchTrackedGameAchievements();
+      }
     } else if (currentTab === Tab.OVERALL && !overallProgress) {
       fetchOverallProgress();
+    } else if (currentTab === Tab.SETTINGS) {
+      loadPluginSettings();
     }
-  }, [currentTab]);
+  }, [currentTab, recentSubTab]);
 
   // Auto-refresh
   useEffect(() => {
@@ -386,18 +554,19 @@ function Content() {
   };
 
   // Sort and filter achievements
-  const getSortedAchievements = (): Achievement[] => {
-    if (!achievements?.achievements) return [];
+  const getSortedAchievements = (achievementList?: Achievement[]): Achievement[] => {
+    const list = achievementList || achievements?.achievements || [];
+    if (!list.length) return [];
     
-    let filtered = [...achievements.achievements];
+    let filtered = [...list];
     
     // Filter by rarity
     if (filterRarity > 0) {
-        filtered = filtered.filter(a => 
-            a.global_percent !== null && 
-            !isNaN(a.global_percent) && 
-            a.global_percent <= filterRarity
-        );
+      filtered = filtered.filter(a => 
+        a.global_percent !== null && 
+        !isNaN(a.global_percent) && 
+        a.global_percent <= filterRarity
+      );
     }
     
     // Filter hidden if not showing
@@ -411,9 +580,9 @@ function Content() {
         case "name":
           return a.display_name.localeCompare(b.display_name);
         case "rarity":
-            const aPercent = (a.global_percent !== null && !isNaN(a.global_percent)) ? a.global_percent : 100;
-            const bPercent = (b.global_percent !== null && !isNaN(b.global_percent)) ? b.global_percent : 100;
-            return aPercent - bPercent;
+          const aPercent = (a.global_percent !== null && !isNaN(a.global_percent)) ? a.global_percent : 100;
+          const bPercent = (b.global_percent !== null && !isNaN(b.global_percent)) ? b.global_percent : 100;
+          return aPercent - bPercent;
         case "unlock":
         default:
           // Unlocked first, then by time
@@ -435,20 +604,10 @@ function Content() {
       <ButtonItem
         layout="below"
         onClick={() => {
-          showContextMenu(
-            <Menu label={achievement.display_name}>
-              <MenuItem>{achievement.description || "Hidden achievement"}</MenuItem>
-              {achievement.global_percent !== null && !isNaN(achievement.global_percent) && (
-                <MenuItem>
-                    <FaPercent /> {formatGlobalPercent(achievement.global_percent)} of players
-                </MenuItem>
-             )}
-              {achievement.unlocked && achievement.unlock_time && (
-                <MenuItem>
-                  <FaClock /> Unlocked: {formatTime(achievement.unlock_time)}
-                </MenuItem>
-              )}
-            </Menu>
+          showModal(
+            <AchievementDetailsModal 
+              achievement={achievement}
+            />
           );
         }}
       >
@@ -628,18 +787,6 @@ function Content() {
                       const refreshedGame = await fetchCurrentGame();
                       if (refreshedGame) {
                         await fetchAchievements(refreshedGame.app_id);
-                      }
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!isLoading) {
-                        e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.3)";
-                        e.currentTarget.style.borderColor = "rgba(255,255,255,0.5)";
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isLoading) {
-                        e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.2)";
-                        e.currentTarget.style.borderColor = "rgba(255,255,255,0.3)";
                       }
                     }}
                   >
@@ -823,76 +970,213 @@ function Content() {
       case Tab.RECENT:
         return (
           <>
-            <PanelSection title="Recent Achievements">
-              <PanelSectionRow>
-                <ButtonItem
-                  layout="below"
-                  onClick={fetchRecentAchievements}
-                  disabled={isLoading}
+            {/* Sub-tab navigation */}
+            <PanelSection>
+              <Focusable style={{ display: "flex", gap: "4px" }}>
+                <DialogButton
+                  style={{ 
+                    flex: 1,
+                    padding: "6px",
+                    fontSize: "12px",
+                    backgroundColor: recentSubTab === RecentSubTab.ALL ? "rgba(255,255,255,0.15)" : "transparent"
+                  }}
+                  onClick={() => setRecentSubTab(RecentSubTab.ALL)}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <FaSync className={isLoading ? "spinning" : ""} />
-                    Refresh Recent
-                  </div>
-                </ButtonItem>
-              </PanelSectionRow>
-              
-              {recentAchievements.length > 0 ? (
-                <div style={{ 
-                  maxHeight: "500px", 
-                  overflowY: "auto",
-                  overflowX: "hidden"
-                }}>
-                  <Focusable className="no-gap-list">
-                    {recentAchievements.map((ach, index) => (
-                      <PanelSectionRow key={`${ach.game_id}_${ach.unlock_time}_${index}`}>
-                        <ButtonItem
-                          layout="below"
-                          onClick={() => {
-                            Navigation.NavigateToExternalWeb(`steam://nav/games/details/${ach.game_id}`);
-                          }}
-                        >
-                          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                            {ach.icon && (
-                              <img 
-                                src={ach.icon} 
-                                style={{ width: "32px", height: "32px", borderRadius: "4px" }}
-                                alt=""
-                              />
-                            )}
-                            <div style={{ flex: 1 }}>
-                              <div style={{ fontSize: "14px", fontWeight: "bold" }}>
-                                {ach.achievement_name}
-                              </div>
-                              <div style={{ fontSize: "12px", opacity: 0.7 }}>
-                                {ach.game_name}
-                              </div>
-                              <div style={{ fontSize: "11px", opacity: 0.6 }}>
-                                {formatTime(ach.unlock_time)}
-                              </div>
-                            </div>
-                            {ach.global_percent !== null && !isNaN(ach.global_percent) && ach.global_percent <= 10 && (
-                              <div style={{ textAlign: "center" }}>
-                                <FaStar style={{ color: "#FFD700" }} />
-                                <div style={{ fontSize: "10px" }}>
-                                  {formatGlobalPercent(ach.global_percent)}
+                  <FaList size={14} style={{ marginRight: "4px" }} />
+                  All Recent
+                </DialogButton>
+                <DialogButton
+                  style={{ 
+                    flex: 1,
+                    padding: "6px",
+                    fontSize: "12px",
+                    backgroundColor: recentSubTab === RecentSubTab.TRACKED ? "rgba(255,255,255,0.15)" : "transparent"
+                  }}
+                  onClick={() => setRecentSubTab(RecentSubTab.TRACKED)}
+                >
+                  <FaEye size={14} style={{ marginRight: "4px" }} />
+                  Tracked Game
+                </DialogButton>
+              </Focusable>
+            </PanelSection>
+
+            {recentSubTab === RecentSubTab.ALL ? (
+              <PanelSection title="Recent Achievements">
+                <PanelSectionRow>
+                  <ButtonItem
+                    layout="below"
+                    onClick={fetchRecentAchievements}
+                    disabled={isLoading}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <FaSync className={isLoading ? "spinning" : ""} />
+                      Refresh Recent
+                    </div>
+                  </ButtonItem>
+                </PanelSectionRow>
+                
+                {recentAchievements.length > 0 ? (
+                  <div style={{ maxHeight: "500px", overflowY: "auto", overflowX: "hidden" }}>
+                    <Focusable className="no-gap-list">
+                      {recentAchievements.map((ach, index) => (
+                        <PanelSectionRow key={`${ach.game_id}_${ach.unlock_time}_${index}`}>
+                          <ButtonItem
+                            layout="below"
+                            onClick={() => {
+                              Navigation.NavigateToSteamWeb(`https://store.steampowered.com/app/${ach.game_id}`);
+                            }}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                              {ach.icon && (
+                                <img 
+                                  src={ach.icon} 
+                                  style={{ width: "32px", height: "32px", borderRadius: "4px" }}
+                                  alt=""
+                                />
+                              )}
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: "14px", fontWeight: "bold" }}>
+                                  {ach.achievement_name}
+                                </div>
+                                <div style={{ fontSize: "12px", opacity: 0.7 }}>
+                                  {ach.game_name}
+                                </div>
+                                <div style={{ fontSize: "11px", opacity: 0.6 }}>
+                                  {formatTime(ach.unlock_time)}
                                 </div>
                               </div>
-                            )}
-                          </div>
-                        </ButtonItem>
-                      </PanelSectionRow>
-                    ))}
-                  </Focusable>
-                </div>
-              ) : (
-                <PanelSectionRow>
-                  <div style={{ opacity: 0.6, textAlign: "center" }}>
-                    {isLoading ? "Loading recent achievements..." : "No recent achievements found"}
+                              {ach.global_percent !== null && !isNaN(ach.global_percent) && ach.global_percent <= 10 && (
+                                <div style={{ textAlign: "center" }}>
+                                  <FaStar style={{ color: "#FFD700" }} />
+                                  <div style={{ fontSize: "10px" }}>
+                                    {formatGlobalPercent(ach.global_percent)}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </ButtonItem>
+                        </PanelSectionRow>
+                      ))}
+                    </Focusable>
                   </div>
-                </PanelSectionRow>
-              )}
-            </PanelSection>
+                ) : (
+                  <PanelSectionRow>
+                    <div style={{ opacity: 0.6, textAlign: "center" }}>
+                      {isLoading ? "Loading recent achievements..." : "No recent achievements found"}
+                    </div>
+                  </PanelSectionRow>
+                )}
+              </PanelSection>
+            ) : (
+              <PanelSection title="Tracked Game">
+                {!trackedGame ? (
+                  <>
+                    <PanelSectionRow>
+                      <div style={{ textAlign: "center", opacity: 0.6, padding: "20px" }}>
+                        No game selected for tracking
+                      </div>
+                    </PanelSectionRow>
+                    <PanelSectionRow>
+                      <ButtonItem
+                        layout="below"
+                        onClick={() => {
+                          if (overallProgress?.perfect_games) {
+                            showModal(
+                              <GameSelectionModal
+                                games={overallProgress.perfect_games}
+                                onSelect={(game) => {
+                                  setTrackedGame(game);
+                                  toaster.toast({
+                                    title: "Game Selected",
+                                    body: `Now tracking: ${game.name}`
+                                  });
+                                }}
+                              />
+                            );
+                          } else {
+                            toaster.toast({
+                              title: "No Games Available",
+                              body: "Please load overall progress first",
+                              critical: true
+                            });
+                          }
+                        }}
+                      >
+                        Select Game to Track
+                      </ButtonItem>
+                    </PanelSectionRow>
+                  </>
+                ) : (
+                  <>
+                    <PanelSectionRow>
+                      <div style={{ 
+                        padding: "10px",
+                        backgroundColor: "rgba(255,255,255,0.05)",
+                        borderRadius: "4px"
+                      }}>
+                        <div style={{ fontWeight: "bold", marginBottom: "4px" }}>
+                          {trackedGame.name}
+                        </div>
+                        <div style={{ fontSize: "12px", opacity: 0.7 }}>
+                          App ID: {trackedGame.app_id}
+                        </div>
+                      </div>
+                    </PanelSectionRow>
+                    
+                    <PanelSectionRow>
+                      <ButtonItem
+                        layout="below"
+                        onClick={() => {
+                          setTrackedGame(null);
+                          setTrackedGameAchievements(null);
+                        }}
+                      >
+                        Clear Tracked Game
+                      </ButtonItem>
+                    </PanelSectionRow>
+                    
+                    <PanelSectionRow>
+                      <ButtonItem
+                        layout="below"
+                        onClick={fetchTrackedGameAchievements}
+                        disabled={isLoading}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <FaSync className={isLoading ? "spinning" : ""} />
+                          Refresh Achievements
+                        </div>
+                      </ButtonItem>
+                    </PanelSectionRow>
+                    
+                    {trackedGameAchievements && !trackedGameAchievements.error && (
+                      <>
+                        <PanelSectionRow>
+                          <ProgressBarWithInfo
+                            nProgress={calculateProgress(trackedGameAchievements.unlocked, trackedGameAchievements.total)}
+                            sOperationText={formatProgressText(trackedGameAchievements.unlocked, trackedGameAchievements.total, true)}
+                            nTransitionSec={0.3}
+                          />
+                        </PanelSectionRow>
+                        
+                        <div style={{ maxHeight: "300px", overflowY: "auto", marginTop: "10px" }}>
+                          <Focusable>
+                            {getSortedAchievements(trackedGameAchievements.achievements)
+                              .filter(a => a.unlocked)
+                              .slice(0, 10)
+                              .map((achievement) => (
+                                <AchievementItem 
+                                  key={achievement.api_name} 
+                                  achievement={achievement} 
+                                />
+                              ))}
+                          </Focusable>
+                        </div>
+                      </>
+                    )}
+                  </>
+                )}
+              </PanelSection>
+            )}
           </>
         );
 
@@ -962,18 +1246,21 @@ function Content() {
             
             {overallProgress?.perfect_games && overallProgress.perfect_games.length > 0 && (
               <PanelSection title="Perfect Games">
-                <div style={{ 
-                  maxHeight: "300px", 
-                  overflowY: "auto",
-                  overflowX: "hidden"
-                }}>
+                <div style={{ maxHeight: "300px", overflowY: "auto", overflowX: "hidden" }}>
                   <Focusable className="no-gap-list">
                     {overallProgress.perfect_games.map((game) => (
                       <PanelSectionRow key={game.app_id}>
                         <ButtonItem
                           layout="below"
                           onClick={() => {
-                            Navigation.NavigateToExternalWeb(`steam://nav/games/details/${game.app_id}`);
+                            showModal(
+                              <ConfirmModal
+                                strTitle={game.name}
+                                strDescription={`${game.achievements} achievements completed (100%)`}
+                                onOK={() => Navigation.NavigateToSteamWeb(`https://store.steampowered.com/app/${game.app_id}`)}
+                                strOKButtonText="View in Steam"
+                              />
+                            );
                           }}
                         >
                           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -1174,6 +1461,54 @@ function Content() {
                 >
                   Clear All Cache
                 </ButtonItem>
+              </PanelSectionRow>
+            </PanelSection>
+
+            <PanelSection title="Settings Management">
+              <PanelSectionRow>
+                <ButtonItem
+                  layout="below"
+                  onClick={async () => {
+                    try {
+                      const reloaded = await reloadSettings();
+                      if (reloaded && !reloaded.error) {
+                        setApiKeySet(!!reloaded.api_key_set);
+                        setSteamUserIdState(reloaded.steam_user_id || "");
+                        if (reloaded.test_app_id) {
+                          setTestGameId(reloaded.test_app_id.toString());
+                        }
+                        toaster.toast({
+                          title: "Settings Reloaded",
+                          body: "Settings have been reloaded from disk"
+                        });
+                      } else {
+                        toaster.toast({
+                          title: "Error",
+                          body: reloaded?.error || "Failed to reload settings",
+                          critical: true
+                        });
+                      }
+                    } catch (error) {
+                      console.error("Failed to reload settings:", error);
+                      toaster.toast({
+                        title: "Error",
+                        body: "Failed to reload settings",
+                        critical: true
+                      });
+                    }
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <FaSync />
+                    Reload Settings
+                  </div>
+                </ButtonItem>
+              </PanelSectionRow>
+              
+              <PanelSectionRow>
+                <div style={{ fontSize: "11px", opacity: 0.6 }}>
+                  Force reload settings from disk if they're not updating
+                </div>
               </PanelSectionRow>
             </PanelSection>
           </>
