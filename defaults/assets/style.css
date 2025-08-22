@@ -1,0 +1,112 @@
+/* styles/index.css */
+
+/* Animations */
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Scrolling improvements */
+.achievement-scroll-container {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+}
+
+.achievement-scroll-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.achievement-scroll-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.achievement-scroll-container::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+}
+
+.achievement-scroll-container::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.5);
+}
+
+/* Remove gaps in lists */
+.no-gap-list {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.no-gap-list > * {
+  margin: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* Common styles */
+.test-mode-badge {
+  background-color: #ff6b6b;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: bold;
+  text-shadow: none;
+}
+
+.test-mode-warning {
+  background-color: rgba(255, 107, 107, 0.1);
+  border: 1px solid rgba(255, 107, 107, 0.3);
+  border-radius: 4px;
+  padding: 8px;
+  font-size: 11px;
+  text-align: center;
+}
+
+.milestone-display {
+  margin-top: 12px;
+  padding: 10px;
+  background-color: rgba(76, 175, 80, 0.1);
+  border-radius: 4px;
+  border-left: 3px solid #4CAF50;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.stat-card {
+  background-color: rgba(255,255,255,0.05);
+  padding: 10px;
+  border-radius: 4px;
+}
+
+.stat-card.perfect-games {
+  background-color: rgba(255,215,0,0.1);
+}
+
+.achievement-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+}
+
+.achievement-icon-large {
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+}
+
+.rarity-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 40px;
+}
