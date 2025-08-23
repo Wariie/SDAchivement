@@ -76,7 +76,7 @@ class SteamAPI:
             return None
         return await self._get(
             f"{self.BASE_URL}/IPlayerService/GetOwnedGames/v1/",
-            {"key": self.api_key, "steamid": steam_id, "include_appinfo": "1", "include_played_free_games": "1"},
+            {"key": self.api_key, "steamid": steam_id, "include_appinfo": "1", "include_played_free_games": "1", "skip_unvetted_apps": "false"},
         )
 
     async def get_recently_played_games(self, steam_id: Optional[str] = None) -> Dict | None:
