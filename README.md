@@ -1,197 +1,264 @@
-# 🏆 Achievement Tracker - Plugin Decky Loader
+# 🏆 SDAchievement - Steam Achievement Tracker for Steam Deck
 
-Un plugin pour Steam Deck qui affiche la progression et les achievements de tes jeux directement dans le menu Quick Access !
+A comprehensive Decky Loader plugin that tracks your Steam game progress and achievements directly in the Steam Deck's Quick Access menu.
 
-## ✨ Fonctionnalités
+## ✨ Features
 
-- **📊 Progression en temps réel** : Affiche la progression du jeu actuellement en cours
-- **🏆 Tracker d'achievements** : Vue détaillée de tous les achievements avec leur statut
-- **📈 Statistiques de jeu** : Temps de jeu, progression histoire, collectibles
-- **⭐ Achievements rares** : Met en avant les achievements les plus difficiles
-- **🔄 Rafraîchissement automatique** : Mise à jour toutes les 30 secondes
-- **📱 Interface intuitive** : Intégration parfaite dans l'interface Steam Deck
+- **📊 Real-time Progress Tracking**: Monitor current game progress and statistics
+- **🏆 Achievement Management**: View detailed achievement lists with unlock status
+- **📈 Overall Progress**: Track your Steam profile's achievement statistics
+- **⭐ Recent Achievements**: View recently unlocked achievements across all games
+- **🔄 Auto-refresh**: Configurable automatic data updates (30-120 seconds)
+- **🎯 Game Detection**: Automatic detection of currently running games
+- **📱 Intuitive Interface**: Seamless integration with Steam Deck UI
+- **⚙️ Settings Management**: Configurable Steam API integration
+
+## 🏗️ Architecture
+
+### Frontend (TypeScript/React)
+- Built with React and TypeScript
+- Uses Decky Loader UI components
+- Modular tab-based interface
+- Custom hooks for state management
+
+### Backend (Python)
+- Modular service architecture
+- Steam API integration
+- Caching system for performance
+- Settings persistence
 
 ## 📦 Installation
 
-### Prérequis
+### Prerequisites
+1. **Decky Loader** installed on Steam Deck
+   - Installation guide: https://github.com/SteamDeckHomebrew/decky-loader
+2. **Steam API Key** (optional but recommended)
+   - Get yours at: https://steamcommunity.com/dev/apikey
 
-1. **Decky Loader** installé sur ton Steam Deck
-   - Si pas encore installé : https://github.com/SteamDeckHomebrew/decky-loader
+### Quick Install
+```bash
+# Clone the repository
+git clone https://github.com/SteamDeckHomebrew/SDAchivement.git
+cd SDAchivement
 
-2. **Mode Développeur** activé dans Decky Loader
+# Install dependencies
+pnpm install
 
-### Structure du projet
+# Build the plugin
+pnpm run build
+
+# Copy to Steam Deck plugins directory
+scp -r . deck@steamdeck:~/homebrew/plugins/SDAchievement/
+```
+
+### Manual Build
+```bash
+# Frontend build
+pnpm run build
+
+# The plugin files will be in the dist/ directory
+```
+
+## 🚀 Usage
+
+1. **Install the plugin** using Decky Loader
+2. **Configure Steam API** (Settings tab):
+   - Enter your Steam API key
+   - Your Steam User ID will be auto-detected
+3. **Launch a game** on your Steam Deck
+4. **Open Quick Access** (... button)
+5. **Select the Trophy icon** (SDAchievement)
+
+### Interface Tabs
+
+#### 🎮 Current Game
+- Displays currently running game information
+- Achievement progress with unlock status
+- Game statistics and playtime
+- Manual refresh options
+
+#### 📅 Recent
+- Recently unlocked achievements (last 10)
+- Option to track specific games
+- Perfect games showcase
+
+#### 📊 Overall
+- Steam profile achievement statistics
+- Total games owned vs completed
+- Achievement completion percentage
+- Perfect games list
+
+#### ⚙️ Settings
+- Steam API key configuration
+- Auto-refresh settings (30-120 seconds)
+- Test game selection
+- Plugin reload options
+
+## 🔧 Configuration
+
+### Steam API Setup
+1. Obtain API key from https://steamcommunity.com/dev/apikey
+2. Enter in Settings tab
+3. User ID is auto-detected from Steam client
+
+### Auto-refresh
+- Enable/disable automatic data updates
+- Configurable interval (30-120 seconds)
+- Only active on Current Game tab
+
+## 📁 Project Structure
 
 ```
-achievement-tracker/
-├── src/
-│   └── index.tsx          # Frontend React/TypeScript
-├── main.py                # Backend Python
-├── plugin.json            # Configuration du plugin
-├── package.json           # Dépendances Node.js
-├── rollup.config.js       # Configuration build
+SDAchivement/
+├── src/                          # Frontend TypeScript/React
+│   ├── components/
+│   │   ├── common/              # Shared UI components
+│   │   ├── achievements/        # Achievement-specific components
+│   │   ├── game/               # Game information components
+│   │   └── tabs/               # Main tab components
+│   ├── hooks/                   # React custom hooks
+│   ├── services/               # Frontend API services
+│   ├── models/                 # TypeScript types
+│   └── index.tsx               # Main entry point
+├── py_modules/                  # Backend Python modules
+│   ├── services/               # Core services
+│   │   ├── achievement.py      # Achievement logic
+│   │   ├── game_detector.py    # Game detection
+│   │   ├── settings.py         # Settings management
+│   │   └── cache.py           # Caching system
+│   ├── models/                # Data models
+│   └── utils/                 # Utilities
+├── main.py                     # Main plugin class
+├── plugin.json                 # Plugin metadata
+├── package.json               # Node.js dependencies
+├── requirements.txt           # Python dependencies
+├── rollup.config.js          # Build configuration
 └── README.md
 ```
 
-### Installation étape par étape
+## 🛠️ Development
 
-1. **Clone ou télécharge le projet**
+### Development Mode
 ```bash
-git clone https://github.com/ton-username/achievement-tracker.git
-cd achievement-tracker
+# Watch mode for frontend changes
+pnpm run watch
+
+# View Python logs
+tail -f ~/homebrew/logs/SDAchievement/plugin.log
+
+# Or use journalctl
+journalctl -u plugin_loader -f
 ```
 
-2. **Installe les dépendances**
-```bash
-# Frontend
-npm install
-# ou
-pnpm install
-```
+### Key Technologies
+- **Frontend**: React, TypeScript, Decky UI
+- **Backend**: Python 3.x, asyncio
+- **Build**: Rollup, pnpm
+- **APIs**: Steam Web API
 
-3. **Build le frontend**
-```bash
-npm run build
-```
+### Data Flow
+1. Frontend requests data via API calls
+2. Python backend processes requests
+3. Steam API integration for live data
+4. Caching system for performance
+5. Auto-refresh for real-time updates
 
-4. **Copie le plugin sur ton Steam Deck**
-```bash
-# Via SSH (remplace deck@steamdeck par ton IP)
-scp -r achievement-tracker/ deck@steamdeck:~/homebrew/plugins/
-```
+## 📝 API Reference
 
-5. **Redémarre Decky Loader**
-   - Va dans les paramètres Decky
-   - Clique sur "Reload Plugins"
-
-## 🚀 Utilisation
-
-1. **Lance un jeu** sur ton Steam Deck
-2. **Ouvre le Quick Access Menu** (bouton ...)
-3. **Sélectionne l'icône Trophy** (Achievement Tracker)
-4. **Explore tes achievements** et ta progression !
-
-### Fonctionnalités principales
-
-- **Jeu Actuel** : Affiche automatiquement le jeu en cours
-- **Barre de progression** : Visualise ton avancement global
-- **Liste d'achievements** : 
-  - 🏆 Doré = Débloqué
-  - Gris = Verrouillé
-  - ⭐ = Achievement rare (<5% des joueurs)
-- **Détails au clic** : Clique sur un achievement pour plus d'infos
-- **Filtre rares** : Active pour voir uniquement les achievements rares
-- **Rafraîchissement** : Force la mise à jour des données
-
-## 🔧 Configuration avancée
-
-### Personnalisation du backend
-
-Le fichier `main.py` peut être modifié pour :
-- Ajouter l'intégration avec l'API Steam Web
-- Implémenter un cache persistant
-- Ajouter des notifications d'achievements
-
-### API Steam Web (optionnel)
-
-Pour des données plus complètes, configure l'API Steam :
-
-1. Obtiens une clé API : https://steamcommunity.com/dev/apikey
-2. Ajoute-la dans `main.py` :
+### Main Plugin Methods
 ```python
-STEAM_API_KEY = "TA_CLE_API"
+# Game Detection
+get_current_game() -> Optional[Dict]
+get_game_info(app_id: int) -> Dict
+
+# Achievement Management  
+get_achievements(app_id: int) -> Dict
+get_recent_achievements(limit: int) -> List[Dict]
+get_achievement_progress() -> Dict
+
+# Settings
+set_steam_api_key(api_key: str) -> bool
+set_steam_user_id(user_id: str) -> bool
+reload_settings() -> Dict
 ```
 
-## 🛠️ Développement
-
-### Mode développement
-```bash
-# Watch mode pour le frontend
-npm run watch
-
-# Logs Python
-tail -f ~/homebrew/logs/achievement-tracker/plugin.log
-```
-
-### Structure des données
-
-**Achievement Object:**
+### Frontend Services
 ```typescript
-{
-  id: string;
-  name: string;
-  description: string;
-  unlocked: boolean;
-  unlock_time?: string;
-  icon?: string;
-  rarity?: number;
-  progress?: string;
-}
+// API calls
+getCurrentGame(): Promise<GameInfo>
+getAchievements(appId: number): Promise<AchievementData>
+getRecentAchievements(): Promise<Achievement[]>
+
+// Settings management
+loadSettings(): Promise<Settings>
+saveSettings(settings: Settings): Promise<boolean>
 ```
-
-**Game Progress:**
-```typescript
-{
-  playtime_total: number;     // minutes
-  playtime_session: number;   
-  completion: {
-    story: number;           // %
-    total: number;           
-    collectibles: number;    
-  }
-}
-```
-
-## 📝 Améliorations futures
-
-- [ ] Intégration complète API Steam
-- [ ] Système de notifications pour nouveaux achievements
-- [ ] Graphiques de progression temporelle
-- [ ] Export des stats en CSV/JSON
-- [ ] Comparaison avec amis Steam
-- [ ] Support multi-comptes
-- [ ] Thèmes personnalisables
-- [ ] Widget pour l'écran d'accueil
 
 ## 🐛 Troubleshooting
 
-### Le plugin n'apparaît pas
-- Vérifie que Decky Loader est bien installé
-- Assure-toi que le dossier est dans `~/homebrew/plugins/`
-- Redémarre le Steam Deck
+### Plugin Not Loading
+- Verify Decky Loader installation
+- Check plugin directory: `~/homebrew/plugins/SDAchievement/`
+- Restart Steam Deck or reload plugins
 
-### Pas de données d'achievements
-- Vérifie que le jeu supporte les achievements Steam
-- Lance le jeu au moins une fois
-- Utilise le bouton Rafraîchir
+### No Achievement Data
+- Ensure Steam API key is configured
+- Verify game supports Steam achievements
+- Check if game was launched at least once
+- Use manual refresh button
 
-### Erreurs Python
+### Performance Issues
+- Check cache directory permissions
+- Reduce auto-refresh frequency
+- Clear cache files if corrupted
+
+### Common Logs
 ```bash
-# Check les logs
+# Plugin logs
+tail -f ~/homebrew/logs/SDAchievement/plugin.log
+
+# Decky Loader logs
 journalctl -u plugin_loader -f
-# ou
-cat ~/homebrew/logs/achievement-tracker/plugin.log
+
+# System logs
+dmesg | grep -i error
+```
+
+## 🤝 Contributing
+
+Contributions are welcome! Please:
+
+1. Fork the repository
+2. Create a feature branch
+3. Follow existing code style
+4. Add tests for new features
+5. Submit a pull request
+
+### Development Setup
+```bash
+git clone https://github.com/SteamDeckHomebrew/SDAchivement.git
+cd SDAchivement
+pnpm install
+pnpm run watch  # Development mode
 ```
 
 ## 📄 License
 
-MIT License - Fais-en ce que tu veux !
+BSD-3-Clause License - see [LICENSE](LICENSE) file for details.
 
-## 🤝 Contribution
+## 🙏 Acknowledgments
 
-Les PRs sont les bienvenues ! N'hésite pas à :
-- Reporter des bugs
-- Proposer des nouvelles fonctionnalités
-- Améliorer le code
-- Traduire l'interface
+- [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader) community
+- Steam Deck Homebrew developers
+- Steam Web API documentation
 
-## 💬 Support
+## 📞 Support
 
-- **Issues GitHub** : [Lien vers ton repo]/issues
-- **Discord Decky** : https://discord.gg/deckyloader
+- **GitHub Issues**: [Report bugs or request features](https://github.com/SteamDeckHomebrew/SDAchivement/issues)
+- **Discord**: [Decky Loader Community](https://discord.gg/deckyloader)
 
 ---
 
-Créé avec ❤️ pour la communauté Steam Deck
+**Created with ❤️ for the Steam Deck community**
 
-**Enjoy tracking tes achievements !** 🎮🏆
+*Happy achievement hunting!* 🎮🏆

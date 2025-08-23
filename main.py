@@ -10,6 +10,7 @@ from services.settings import SettingsService
 from services.game_detector import GameDetectorService
 from services.achievement import AchievementService
 from services.cache import CacheService
+from services.steam_scanner import SteamScannerService
 from utils.debug import DebugUtils
 from steam_api import SteamAPI
 
@@ -30,6 +31,7 @@ class Plugin:
         self.settings_service = SettingsService(self.settings_dir)
         self.game_detector = GameDetectorService()
         self.cache_service = CacheService(self.cache_dir)
+        self.steam_scanner = SteamScannerService()
         self.debug_utils = DebugUtils()
         
         # These will be initialized after settings are loaded
@@ -130,7 +132,8 @@ class Plugin:
                 "steam_user_id": self.current_user_id or "",
                 "test_app_id": self.test_app_id,
                 "auto_refresh": self.settings_service.settings.get('auto_refresh', True) if self.settings_service.settings else True,# You can add these to settings service if needed
-                "refresh_interval": refresh_interval
+                "refresh_interval": refresh_interval,
+                "tracked_game": self.settings_service.get_tracked_game()
             }
         except Exception as e:
             decky.logger.error(f"Failed to load settings: {e}")
@@ -149,7 +152,8 @@ class Plugin:
                 "api_key_set": bool(self.settings_service.api_key),
                 "user_id_set": bool(self.settings_service.user_id),
                 "auto_refresh": auto_refresh,
-                "refresh_interval": refresh_interval
+                "refresh_interval": refresh_interval,
+                "tracked_game": self.settings_service.get_tracked_game()
             }
         except Exception as e:
             decky.logger.error(f"Failed to get settings: {e}")
@@ -185,7 +189,8 @@ class Plugin:
                 "api_key_set": bool(self.settings_service.api_key),
                 "user_id_set": bool(self.settings_service.user_id),
                 "auto_refresh": auto_refresh,
-                "refresh_interval": refresh_interval
+                "refresh_interval": refresh_interval,
+                "tracked_game": self.settings_service.get_tracked_game()
             }
                 
         except Exception as e:
@@ -239,6 +244,14 @@ class Plugin:
         except Exception as e:
             decky.logger.error(f"Failed to set user ID: {e}")
             return False
+        
+    async def set_tracked_game(self, app_id: int, name: str) -> bool:
+        """Set tracked game"""
+        return await self.settings_service.set_tracked_game(app_id, name)
+
+    async def clear_tracked_game(self) -> bool:
+        """Clear tracked game"""
+        return await self.settings_service.clear_tracked_game()
 
     async def set_refresh_interval(self, interval: int) -> bool:
         """Set and save the auto-refresh interval"""
@@ -294,6 +307,10 @@ class Plugin:
     async def get_game_info(self, app_id: int) -> Dict:
         """Get game information"""
         return await self.game_detector.get_game_info(app_id, self.api)
+    
+    async def get_installed_games(self) -> List[Dict]:
+        """Get locally installed Steam games by scanning installation files"""
+        return await self.steam_scanner.get_installed_games()
     
     # ==================== Achievement Functions ====================
     

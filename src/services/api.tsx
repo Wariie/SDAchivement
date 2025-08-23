@@ -23,3 +23,6 @@ export const clearTestGame = callable<[], boolean>("clear_test_game");
 export const reloadSettings = callable<[], PluginSettings>("reload_settings");
 export const saveRefreshIntervalBackend = callable<[interval: number], boolean>("set_refresh_interval");
 export const saveAutoRefreshBackend = callable<[enabled: boolean], boolean>("set_auto_refresh");
+export const setTrackedGame = callable<[app_id: number, name: string], boolean>("set_tracked_game");
+export const clearTrackedGame = callable<[], boolean>("clear_tracked_game");
+export const getInstalledGames = callable<[], GameInfo[]>("get_installed_games");

@@ -1,17 +1,7 @@
 import React from "react";
 import { PanelSectionRow, ButtonItem } from "@decky/ui";
-import { FaGamepad, FaCheck, FaLock, FaTrophy, FaClock, FaStar } from "react-icons/fa";
-
-// GameInfo type extended with playtime (in minutes)
-export interface GameInfo {
-  app_id: number;
-  name: string;
-  is_running: boolean;
-  has_achievements: boolean;
-  achievements: number;
-  header_image?: string;
-  playtime_forever?: number; // Total playtime in minutes
-}
+import { FaGamepad, FaLock, FaTrophy, FaClock, FaStar } from "react-icons/fa";
+import { GameInfo } from "../models";
 
 // Achievement type for rarest achievement
 interface Achievement {

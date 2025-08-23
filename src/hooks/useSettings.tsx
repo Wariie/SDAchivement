@@ -10,6 +10,7 @@ import {
   saveRefreshIntervalBackend,
   saveAutoRefreshBackend
 } from "../services/api";
+import { TrackedGame } from "../models";
 
 export interface UseSettingsReturn {
   // State
@@ -19,6 +20,7 @@ export interface UseSettingsReturn {
   refreshInterval: number;
   testGameId: string;
   steamApiKey: string;
+  trackedGame: TrackedGame | null;
   settingsLoaded: boolean;
   
   // Setters
@@ -42,6 +44,7 @@ export const useSettings = (): UseSettingsReturn => {
   const [refreshInterval, setRefreshInterval] = useState(30);
   const [testGameId, setTestGameId] = useState("");
   const [steamApiKey, setSteamApiKeyState] = useState("");
+  const [trackedGame, setTrackedGame] = useState<TrackedGame | null>(null);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   
   const lastSavedInterval = useRef(30);
@@ -57,6 +60,9 @@ export const useSettings = (): UseSettingsReturn => {
         lastSavedInterval.current = result.refresh_interval ?? 30;
         if (result.test_app_id) {
           setTestGameId(result.test_app_id.toString());
+        }
+        if (result.tracked_game) {
+          setTrackedGame(result.tracked_game);
         }
         setSettingsLoaded(true);
       }
@@ -217,6 +223,9 @@ export const useSettings = (): UseSettingsReturn => {
         if (reloaded.test_app_id) {
           setTestGameId(reloaded.test_app_id.toString());
         }
+        if (reloaded.tracked_game) {
+          setTrackedGame(reloaded.tracked_game);
+        }
         setSettingsLoaded(false);
         toaster.toast({
           title: "Settings Reloaded",
@@ -247,6 +256,7 @@ export const useSettings = (): UseSettingsReturn => {
     refreshInterval,
     testGameId,
     steamApiKey,
+    trackedGame,
     settingsLoaded,
     
     // Setters

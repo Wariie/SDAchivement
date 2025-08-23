@@ -1,5 +1,5 @@
 // components/tabs/SettingsTab.tsx
-import { VFC } from "react";
+import { VFC, useCallback } from "react";
 import { 
   PanelSection, 
   PanelSectionRow, 
@@ -8,19 +8,33 @@ import {
   ToggleField,
   Menu,
   MenuItem,
-  showContextMenu
+  showContextMenu,
+  showModal
 } from "@decky/ui";
-import { FaKey, FaSync } from "react-icons/fa";
+import { FaKey, FaSync, FaEye } from "react-icons/fa";
 import { toaster } from "@decky/api";
 import { UseSettingsReturn } from "../../hooks/useSettings";
-import { refreshCache } from "../../services/api";
+import { refreshCache, setTrackedGame, clearTrackedGame } from "../../services/api";
+import { GameSelectionModal } from "../game/GameSelectionModal";
+import { GameInfo, TrackedGame } from "../../models";
 
 interface SettingsTabProps {
   settings: UseSettingsReturn;
+  installedGames: GameInfo[];
+  trackedGame: TrackedGame | null;
   onFullRefresh?: () => Promise<void>;
+  onSetTrackedGame: (game: TrackedGame) => Promise<void>;
+  onClearTrackedGame: () => Promise<void>;
 }
 
-export const SettingsTab: VFC<SettingsTabProps> = ({ settings, onFullRefresh }) => {
+export const SettingsTab: VFC<SettingsTabProps> = ({ 
+  settings, 
+  installedGames, 
+  trackedGame, 
+  onFullRefresh, 
+  onSetTrackedGame, 
+  onClearTrackedGame 
+}) => {
   const formatIntervalDisplay = (interval: number): string => {
     return interval < 60 ? `${interval} seconds` : `${interval / 60} minutes`;
   };
@@ -48,6 +62,35 @@ export const SettingsTab: VFC<SettingsTabProps> = ({ settings, onFullRefresh }) 
     }
   };
 
+  const handleSelectTrackedGame = useCallback(() => {
+    if (installedGames.length === 0) {
+      toaster.toast({
+        title: "No Games Available",
+        body: "Please visit the Overall tab first to load your games library.",
+        critical: true
+      });
+      return;
+    }
+
+    let modalInstance: any = null;
+    
+    modalInstance = showModal(
+      <GameSelectionModal
+        games={installedGames}
+        onSelect={async (game) => {
+          await onSetTrackedGame({
+            app_id: game.app_id,
+            name: game.name
+          });
+          modalInstance?.Close();
+        }}
+        closeModal={() => {
+          modalInstance?.Close();
+        }}
+      />
+    );
+  }, [installedGames, onSetTrackedGame]);
+
   const handleSetTestGame = async () => {
     const success = await settings.handleSetTestGame();
     if (success && onFullRefresh) {
@@ -63,7 +106,7 @@ export const SettingsTab: VFC<SettingsTabProps> = ({ settings, onFullRefresh }) 
   };
 
   return (
-    <>
+    <div style={{ padding: "0", margin: "0" }}>
       {/* Steam API Configuration */}
       <PanelSection title="Steam API Configuration">
         <PanelSectionRow>
@@ -87,8 +130,8 @@ export const SettingsTab: VFC<SettingsTabProps> = ({ settings, onFullRefresh }) 
             onClick={handleSaveApiKey}
             disabled={!settings.steamApiKey}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <FaKey />
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px" }}>
+              <FaKey style={{ fontSize: "12px" }} />
               Save API Key
             </div>
           </ButtonItem>
@@ -162,7 +205,9 @@ export const SettingsTab: VFC<SettingsTabProps> = ({ settings, onFullRefresh }) 
                 );
               }}
             >
-              Interval: {formatIntervalDisplay(settings.refreshInterval)}
+              <div style={{ fontSize: "14px" }}>
+                Interval: {formatIntervalDisplay(settings.refreshInterval)}
+              </div>
             </ButtonItem>
           </PanelSectionRow>
         )}
@@ -185,7 +230,9 @@ export const SettingsTab: VFC<SettingsTabProps> = ({ settings, onFullRefresh }) 
             onClick={handleSetTestGame}
             disabled={!settings.testGameId}
           >
-            Set Test Game
+            <div style={{ fontSize: "14px" }}>
+              Set Test Game
+            </div>
           </ButtonItem>
         </PanelSectionRow>
         
@@ -194,7 +241,9 @@ export const SettingsTab: VFC<SettingsTabProps> = ({ settings, onFullRefresh }) 
             layout="below"
             onClick={handleClearTestGame}
           >
-            Clear Test Game
+            <div style={{ fontSize: "14px" }}>
+              Clear Test Game
+            </div>
           </ButtonItem>
         </PanelSectionRow>
         
@@ -204,6 +253,58 @@ export const SettingsTab: VFC<SettingsTabProps> = ({ settings, onFullRefresh }) 
           </div>
         </PanelSectionRow>
       </PanelSection>
+
+      {/* Tracked Game */}
+      <PanelSection title="Tracked Game">
+        <PanelSectionRow>
+          <div style={{ fontSize: "12px", opacity: 0.8, marginBottom: "8px" }}>
+            Set a game to track its achievements even when not running
+          </div>
+        </PanelSectionRow>
+        
+        {trackedGame && (
+          <PanelSectionRow>
+            <div style={{ 
+              padding: "10px",
+              backgroundColor: "rgba(255,255,255,0.05)",
+              borderRadius: "4px",
+              marginBottom: "8px"
+            }}>
+              <div style={{ fontWeight: "bold", marginBottom: "4px", fontSize: "14px" }}>
+                <FaEye style={{ marginRight: "8px", color: "#4a9eff" }} />
+                {trackedGame.name}
+              </div>
+              <div style={{ fontSize: "12px", opacity: 0.7 }}>
+                App ID: {trackedGame.app_id}
+              </div>
+            </div>
+          </PanelSectionRow>
+        )}
+        
+        <PanelSectionRow>
+          <ButtonItem
+            layout="below"
+            onClick={handleSelectTrackedGame}
+          >
+            <div style={{ fontSize: "14px" }}>
+              {trackedGame ? "Change Tracked Game" : "Select Tracked Game"}
+            </div>
+          </ButtonItem>
+        </PanelSectionRow>
+        
+        {trackedGame && (
+          <PanelSectionRow>
+            <ButtonItem
+              layout="below"
+              onClick={onClearTrackedGame}
+            >
+              <div style={{ fontSize: "14px" }}>
+                Clear Tracked Game
+              </div>
+            </ButtonItem>
+          </PanelSectionRow>
+        )}
+      </PanelSection>
       
       {/* Cache Management */}
       <PanelSection title="Cache">
@@ -212,7 +313,9 @@ export const SettingsTab: VFC<SettingsTabProps> = ({ settings, onFullRefresh }) 
             layout="below"
             onClick={handleClearCache}
           >
-            Clear All Cache
+            <div style={{ fontSize: "14px" }}>
+              Clear All Cache
+            </div>
           </ButtonItem>
         </PanelSectionRow>
       </PanelSection>
@@ -224,8 +327,8 @@ export const SettingsTab: VFC<SettingsTabProps> = ({ settings, onFullRefresh }) 
             layout="below"
             onClick={settings.handleReloadSettings}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <FaSync />
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px" }}>
+              <FaSync style={{ fontSize: "12px" }} />
               Reload Settings
             </div>
           </ButtonItem>
@@ -237,6 +340,6 @@ export const SettingsTab: VFC<SettingsTabProps> = ({ settings, onFullRefresh }) 
           </div>
         </PanelSectionRow>
       </PanelSection>
-    </>
+    </div>
   );
 };

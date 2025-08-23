@@ -81,6 +81,52 @@ class AchievementService:
             decky.logger.error(f"Failed to get recent achievements: {e}")
             return []
     
+    async def get_user_games(self) -> List[Dict]:
+        """Get all user's owned games with community stats (likely has achievements)"""
+        try:
+            if not self.api:
+                decky.logger.error("Steam API not initialized for get_user_games")
+                return []
+
+            if not self.api_key or not self.user_id:
+                decky.logger.error("Steam API key or user ID not configured for get_user_games")
+                return []
+
+            decky.logger.info("Getting user's owned games")
+            
+            # Get owned games
+            owned_games = await self.api.get_owned_games()
+            if not owned_games:
+                decky.logger.error("Failed to get owned games")
+                return []
+            
+            games = owned_games.get("response", {}).get("games", [])
+            decky.logger.info(f"Found {len(games)} total owned games")
+            
+            # Filter games that likely have achievements (has_community_visible_stats)
+            # This is much faster than checking schema for each game
+            games_with_achievements = []
+            for game in games:
+                if game.get("has_community_visible_stats", False):
+                    games_with_achievements.append({
+                        "app_id": game["appid"],
+                        "name": game["name"],
+                        "has_achievements": True,
+                        "achievements": 0,  # We don't know the exact count, but that's okay
+                        "playtime_forever": game.get("playtime_forever", 0),
+                        "is_running": False
+                    })
+            
+            # Sort by playtime (most played first) for better UX
+            games_with_achievements.sort(key=lambda x: x["playtime_forever"], reverse=True)
+            
+            decky.logger.info(f"Found {len(games_with_achievements)} games with community stats")
+            return games_with_achievements
+            
+        except Exception as e:
+            decky.logger.error(f"Failed to get user games: {e}")
+            return []
+
     async def get_achievement_progress(self, force_refresh: bool = False) -> Dict:
         """Get overall achievement progress across all games"""
         try:

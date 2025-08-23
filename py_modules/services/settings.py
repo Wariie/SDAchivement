@@ -112,3 +112,34 @@ class SettingsService:
         except Exception as e:
             decky.logger.error(f"Failed to clear test game: {e}")
             return False
+
+    async def set_tracked_game(self, app_id: int, name: str) -> bool:
+        """Set tracked game"""
+        try:
+            decky.logger.info(f"Setting tracked game: {name} (ID: {app_id})")
+            settings = self.settings.copy()
+            settings['tracked_game'] = {
+                'app_id': app_id,
+                'name': name,
+                'last_checked': None
+            }
+            return await self.save(settings)
+        except Exception as e:
+            decky.logger.error(f"Failed to set tracked game: {e}")
+            return False
+    
+    async def clear_tracked_game(self) -> bool:
+        """Clear tracked game"""
+        try:
+            decky.logger.info("Clearing tracked game")
+            settings = self.settings.copy()
+            if 'tracked_game' in settings:
+                del settings['tracked_game']
+            return await self.save(settings)
+        except Exception as e:
+            decky.logger.error(f"Failed to clear tracked game: {e}")
+            return False
+    
+    def get_tracked_game(self) -> Optional[Dict]:
+        """Get current tracked game"""
+        return self.settings.get('tracked_game')

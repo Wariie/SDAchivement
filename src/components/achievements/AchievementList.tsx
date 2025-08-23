@@ -1,7 +1,7 @@
 // components/achievements/AchievementList.tsx
 import { VFC, useMemo } from "react";
 import { Focusable } from "@decky/ui";
-import { AchievementListProps, Achievement, SortBy } from "../../models";
+import { AchievementListProps, Achievement } from "../../models";
 import { AchievementItem } from "./AchievementItem";
 import { AchievementDetailsModal } from "./AchievementDetailsModal";
 import { LoadingSpinner } from "../common/LoadingSpinner";
@@ -12,6 +12,8 @@ export const AchievementList: VFC<AchievementListProps> = ({
   sortBy, 
   showHidden, 
   filterRarity,
+  showUnlockedOnly = false,
+  showLockedOnly = false,
   isLoading = false
 }) => {
   const sortedAchievements = useMemo(() => {
@@ -31,6 +33,13 @@ export const AchievementList: VFC<AchievementListProps> = ({
     // Filter hidden if not showing
     if (!showHidden) {
       filtered = filtered.filter(a => !a.hidden || a.unlocked);
+    }
+    
+    // Filter by unlock status
+    if (showUnlockedOnly) {
+      filtered = filtered.filter(a => a.unlocked);
+    } else if (showLockedOnly) {
+      filtered = filtered.filter(a => !a.unlocked);
     }
     
     // Sort
@@ -55,7 +64,7 @@ export const AchievementList: VFC<AchievementListProps> = ({
     });
     
     return filtered;
-  }, [achievements, sortBy, showHidden, filterRarity]);
+  }, [achievements, sortBy, showHidden, filterRarity, showUnlockedOnly, showLockedOnly]);
 
   const handleAchievementClick = (achievement: Achievement) => {
     showModal(

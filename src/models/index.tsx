@@ -1,9 +1,5 @@
 // types/index.ts
 
-// GameInfo type extended with playtime (in minutes)
-
-
-// Achievement type for rarest achievement
 export interface Achievement {
   api_name: string;
   display_name: string;
@@ -47,6 +43,7 @@ export interface RecentAchievement {
   global_percent: number;
 }
 
+// GameInfo type extended with playtime (in minutes)
 export interface GameInfo {
   app_id: number;
   name: string;
@@ -76,10 +73,6 @@ export enum Tab {
   SETTINGS = "settings"
 }
 
-export enum RecentSubTab {
-  ALL = "all",
-  TRACKED = "tracked"
-}
 
 export type SortBy = "name" | "unlock" | "rarity";
 
@@ -93,6 +86,8 @@ export interface AchievementListProps {
   sortBy: SortBy;
   showHidden: boolean;
   filterRarity: number;
+  showUnlockedOnly?: boolean;
+  showLockedOnly?: boolean;
   isLoading?: boolean;
 }
 
@@ -125,6 +120,7 @@ export interface PluginSettings {
   auto_refresh: boolean;
   refresh_interval: number;
   test_app_id?: number;
+  tracked_game?: TrackedGame;
   api_key_set?: boolean;
   error?: string;
 }
