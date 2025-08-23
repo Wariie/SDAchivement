@@ -6,6 +6,7 @@ import { OverallProgress, GameInfo } from "../../models";
 import { ProgressDisplay } from "../common/ProgressDisplay";
 import { LoadingSpinner } from "../common/LoadingSpinner";
 import { getMilestoneInfo } from "../../services/formatters";
+import { useGameArtwork } from "../../hooks/useGameArtwork";
 
 interface OverallTabProps {
   overallProgress: OverallProgress | null;
@@ -14,52 +15,160 @@ interface OverallTabProps {
   onGameClick?: (gameId: number) => void;
 }
 
-// Game Info Modal Component - Decky Compatible
-const GameInfoModal: VFC<{ game: GameInfo; closeModal?: () => void }> = ({ game, closeModal }) => {
+// Enhanced Perfect Game Modal Component
+const PerfectGameModal: VFC<{ game: GameInfo; closeModal?: () => void }> = ({ game, closeModal }) => {
+  const { getBestImage } = useGameArtwork(game.app_id);
+  
+  const formatPlaytime = (minutes?: number): string => {
+    if (!minutes || minutes === 0) return "Not tracked";
+    if (minutes < 60) return `${minutes}m`;
+    const hours = Math.round(minutes / 60 * 10) / 10;
+    return `${hours}h`;
+  };
+
   return (
     <ConfirmModal
-      strTitle={`🏆 ${game.name}`}
+      strTitle=""
       onOK={closeModal}
       onCancel={closeModal}
       strOKButtonText="Close"
       bHideCloseIcon={false}
     >
-      <div style={{ padding: "10px" }}>
-        <div style={{ marginBottom: "15px" }}>
-          <strong>App ID:</strong> {game.app_id}
-        </div>
-        <div style={{ marginBottom: "15px" }}>
-          <strong>Total Achievements:</strong> {game.achievements}
-        </div>
-        <div style={{ marginBottom: "15px" }}>
-          <strong>Status:</strong> <span style={{ color: "#4CAF50", fontWeight: "bold" }}>💯 Perfect</span>
-        </div>
-        
-        {game.header_image && (
-          <div style={{ textAlign: "center", marginTop: "15px" }}>
-            <img 
-              src={game.header_image} 
-              style={{ 
-                maxWidth: "100%", 
-                borderRadius: "4px",
-                maxHeight: "150px"
-              }}
-              alt={game.name}
-            />
-          </div>
-        )}
-        
+      <div style={{ padding: "0" }}>
+        {/* Hero Image Banner */}
         <div style={{
-          marginTop: "15px",
-          padding: "8px",
-          backgroundColor: "rgba(255, 215, 0, 0.1)",
-          borderRadius: "4px",
-          textAlign: "center",
-          border: "1px solid rgba(255, 215, 0, 0.3)",
-          fontSize: "12px",
-          opacity: 0.8
+          position: "relative",
+          height: "120px",
+          background: "linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)",
+          borderRadius: "8px 8px 0 0",
+          overflow: "hidden",
+          marginBottom: "15px"
         }}>
-          All achievements completed!
+          {getBestImage(game.header_image) && (
+            <img 
+              src={getBestImage(game.header_image)!}
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                opacity: 0.8
+              }}
+              alt=""
+            />
+          )}
+          
+          {/* Overlay with gradient */}
+          <div style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.7) 100%)"
+          }} />
+          
+          {/* Title and Perfect Badge */}
+          <div style={{
+            position: "absolute",
+            bottom: "10px",
+            left: "15px",
+            right: "15px",
+            color: "white"
+          }}>
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: "4px"
+            }}>
+              <h3 style={{
+                margin: 0,
+                fontSize: "18px",
+                fontWeight: "bold",
+                textShadow: "1px 1px 2px rgba(0,0,0,0.8)",
+                flex: 1,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap"
+              }}>
+                {game.name}
+              </h3>
+              <span style={{
+                backgroundColor: "#FFD700",
+                color: "#000",
+                padding: "4px 8px",
+                borderRadius: "12px",
+                fontSize: "10px",
+                fontWeight: "bold",
+                marginLeft: "8px"
+              }}>
+                💯 PERFECT
+              </span>
+            </div>
+          </div>
+        </div>
+        
+        {/* Stats Grid */}
+        <div style={{ padding: "0 15px 15px" }}>
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: "12px",
+            marginBottom: "15px"
+          }}>
+            <div style={{
+              backgroundColor: "rgba(255,255,255,0.05)",
+              padding: "12px",
+              borderRadius: "6px",
+              textAlign: "center"
+            }}>
+              <div style={{ fontSize: "20px", fontWeight: "bold", color: "#4CAF50" }}>
+                {game.achievements}
+              </div>
+              <div style={{ fontSize: "11px", opacity: 0.7 }}>
+                Achievements
+              </div>
+            </div>
+            
+            <div style={{
+              backgroundColor: "rgba(255,255,255,0.05)",
+              padding: "12px",
+              borderRadius: "6px",
+              textAlign: "center"
+            }}>
+              <div style={{ fontSize: "20px", fontWeight: "bold", color: "#2196F3" }}>
+                {formatPlaytime(game.playtime_forever)}
+              </div>
+              <div style={{ fontSize: "11px", opacity: 0.7 }}>
+                Playtime
+              </div>
+            </div>
+          </div>
+
+          {/* Perfect Completion Message */}
+          <div style={{
+            padding: "12px",
+            backgroundColor: "rgba(255, 215, 0, 0.1)",
+            borderRadius: "6px",
+            border: "1px solid rgba(255, 215, 0, 0.3)",
+            textAlign: "center"
+          }}>
+            <div style={{ fontSize: "13px", fontWeight: "500", marginBottom: "4px" }}>
+              🏆 Perfect Game Achievement
+            </div>
+            <div style={{ fontSize: "11px", opacity: 0.8 }}>
+              All {game.achievements} achievements unlocked!
+            </div>
+          </div>
+
+          <div style={{
+            marginTop: "12px",
+            fontSize: "11px",
+            opacity: 0.6,
+            textAlign: "center"
+          }}>
+            App ID: {game.app_id}
+          </div>
         </div>
       </div>
     </ConfirmModal>
@@ -69,26 +178,55 @@ const GameInfoModal: VFC<{ game: GameInfo; closeModal?: () => void }> = ({ game,
 export const OverallTab: VFC<OverallTabProps> = ({
   overallProgress,
   isLoading,
-  onFetchProgress,
-  onGameClick
+  onFetchProgress
 }) => {
   const getCompletionStats = () => {
     if (!overallProgress || overallProgress.error) return null;
     
     const gamesStarted = overallProgress.games_with_achievements;
-    const unlockRate = overallProgress.total_achievements > 0
-      ? Math.round((overallProgress.unlocked_achievements / overallProgress.total_achievements * 100) * 10) / 10
-      : 0;
-    const remaining = overallProgress.total_achievements - overallProgress.unlocked_achievements;
-    const avgAchievementsPerGame = gamesStarted > 0
-      ? Math.round(overallProgress.total_achievements / gamesStarted)
-      : 0;
+    const gamesOwned = overallProgress.total_games;
+    const perfectGames = overallProgress.perfect_games_count;
+    const unlocked = overallProgress.unlocked_achievements;
+    const total = overallProgress.total_achievements;
+    
+    // Main completion rate
+    const unlockRate = total > 0 ? Math.round((unlocked / total) * 1000) / 10 : 0;
+    
+    // Remaining achievements
+    const remaining = total - unlocked;
+    
+    // Average achievements per game (total/started)
+    const avgAchievementsPerGame = gamesStarted > 0 ? Math.round(total / gamesStarted) : 0;
+    
+    // Perfect game completion rate
+    const perfectRate = gamesStarted > 0 ? Math.round((perfectGames / gamesStarted) * 1000) / 10 : 0;
+    
+    // Games participation rate (started vs owned)
+    const participationRate = gamesOwned > 0 ? Math.round((gamesStarted / gamesOwned) * 1000) / 10 : 0;
+    
+    // Achievement density (unlocked per started game)
+    const avgUnlockedPerGame = gamesStarted > 0 ? Math.round(unlocked / gamesStarted) : 0;
+    
+    // Progress towards next perfect game (games in progress)
+    const gamesInProgress = gamesStarted - perfectGames;
+    
+    // Estimated completion if average continues
+    const projectedTotal = gamesStarted > 0 ? Math.round((unlocked / gamesStarted) * gamesOwned) : 0;
     
     return {
       gamesStarted,
+      gamesOwned,
+      perfectGames,
+      unlocked,
+      total,
       unlockRate,
       remaining,
-      avgAchievementsPerGame
+      avgAchievementsPerGame,
+      perfectRate,
+      participationRate,
+      avgUnlockedPerGame,
+      gamesInProgress,
+      projectedTotal
     };
   };
 
@@ -176,24 +314,10 @@ export const OverallTab: VFC<OverallTabProps> = ({
                   borderBottom: "1px solid rgba(255,255,255,0.1)"
                 }}>
                   <span style={{ fontSize: "13px", opacity: 0.8 }}>
-                    📊 Avg per Started Game
+                    📈 Avg Unlocked/Game
                   </span>
                   <span style={{ fontWeight: "bold", fontSize: "13px" }}>
-                    {overallProgress.average_completion || 0}%
-                  </span>
-                </div>
-                
-                <div style={{ 
-                  display: "flex", 
-                  justifyContent: "space-between",
-                  padding: "6px 0",
-                  borderBottom: "1px solid rgba(255,255,255,0.1)"
-                }}>
-                  <span style={{ fontSize: "13px", opacity: 0.8 }}>
-                    🎯 Achievements Left
-                  </span>
-                  <span style={{ fontWeight: "bold", fontSize: "13px" }}>
-                    {stats?.remaining.toLocaleString() || 0}
+                    {stats?.avgUnlockedPerGame || 0}
                   </span>
                 </div>
                 
@@ -203,10 +327,10 @@ export const OverallTab: VFC<OverallTabProps> = ({
                   padding: "6px 0"
                 }}>
                   <span style={{ fontSize: "13px", opacity: 0.8 }}>
-                    📈 Avg per Game
+                    🎯 Achievements Left
                   </span>
                   <span style={{ fontWeight: "bold", fontSize: "13px" }}>
-                    {stats?.avgAchievementsPerGame || 0} achievements
+                    {stats?.remaining.toLocaleString() || 0}
                   </span>
                 </div>
               </div>
@@ -290,7 +414,7 @@ export const OverallTab: VFC<OverallTabProps> = ({
                     layout="below"
                     onClick={() => {
                       showModal(
-                        <GameInfoModal game={game} />
+                        <PerfectGameModal game={game} />
                       );
                     }}
                   >

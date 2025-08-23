@@ -1,7 +1,7 @@
 {
   "name": "SDAchievement",
   "author": "Guilhem Mateo",
-  "flags": ["debug", "_root"],
+  "flags": ["debug"],
   "api_version": 1,
   "publish": {
     "tags": ["achievements", "progress", "steam", "tracker"],

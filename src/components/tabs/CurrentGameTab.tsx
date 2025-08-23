@@ -1,13 +1,14 @@
 // components/tabs/CurrentGameTab.tsx
-import { VFC, useState, useCallback } from "react";
-import { PanelSection, PanelSectionRow, ButtonItem, ToggleField, DialogButton, showModal } from "@decky/ui";
-import { FaSync, FaEye, FaGamepad } from "react-icons/fa";
+import { VFC, useState, useCallback, useEffect } from "react";
+import { PanelSection, PanelSectionRow, ButtonItem, ToggleField, showModal } from "@decky/ui";
+import { FaSync, FaChevronDown, FaChevronUp } from "react-icons/fa";
 import { GameInfo, AchievementData, SortBy, TrackedGame } from "../../models";
 import { GameBanner } from "../game/GameBanner";
 import { ProgressDisplay } from "../common/ProgressDisplay";
 import { AchievementList } from "../achievements/AchievementList";
 import { LoadingSpinner } from "../common/LoadingSpinner";
 import { GameSelectionModal } from "../game/GameSelectionModal";
+import { getGameInfo } from "../../services/api";
 
 interface CurrentGameTabProps {
   currentGame: GameInfo | null;
@@ -43,7 +44,9 @@ export const CurrentGameTab: VFC<CurrentGameTabProps> = ({
   const [filterRarity, setFilterRarity] = useState(0);
   const [showUnlockedOnly, setShowUnlockedOnly] = useState(false);
   const [showLockedOnly, setShowLockedOnly] = useState(false);
-  const [viewMode, setViewMode] = useState<"current" | "tracked">(currentGame ? "current" : "tracked");
+  const [viewMode, setViewMode] = useState<"current" | "tracked">("current");
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [enhancedTrackedGame, setEnhancedTrackedGame] = useState<GameInfo | null>(null);
 
   const handleRefresh = async () => {
     if (viewMode === "current") {
@@ -82,15 +85,43 @@ export const CurrentGameTab: VFC<CurrentGameTabProps> = ({
     );
   }, [installedGames, onSetTrackedGame]);
 
-  // Auto-switch to current game when one starts running
-  if (currentGame && viewMode === "tracked") {
-    setViewMode("current");
-  }
-  
-  // Auto-switch to tracked if no current game and we have a tracked game
-  if (!currentGame && trackedGame && viewMode === "current") {
-    setViewMode("tracked");
-  }
+  // Auto-switch logic - only for initial setup, not when user manually toggles
+  useEffect(() => {
+    // Only auto-switch to tracked if no current game and we have a tracked game (initial setup)
+    if (!currentGame && trackedGame && viewMode === "current") {
+      setViewMode("tracked");
+    }
+  }, [currentGame, trackedGame]); // Removed viewMode from dependencies to prevent loops
+
+  // Fetch enhanced tracked game info (with header_image)
+  useEffect(() => {
+    const fetchTrackedGameInfo = async () => {
+      if (trackedGame && trackedGame.app_id) {
+        try {
+          console.log("Fetching enhanced info for tracked game:", trackedGame.app_id);
+          const gameInfo = await getGameInfo(trackedGame.app_id);
+          if (gameInfo) {
+            // Create enhanced game object with header_image
+            const enhanced = {
+              ...gameInfo,
+              app_id: trackedGame.app_id,
+              name: trackedGame.name, // Keep the tracked name
+              is_running: false // Tracked games aren't necessarily running
+            };
+            setEnhancedTrackedGame(enhanced);
+            console.log("Enhanced tracked game info loaded:", enhanced);
+          }
+        } catch (error) {
+          console.error("Failed to fetch tracked game info:", error);
+          setEnhancedTrackedGame(null);
+        }
+      } else {
+        setEnhancedTrackedGame(null);
+      }
+    };
+
+    fetchTrackedGameInfo();
+  }, [trackedGame]);
 
   const getSortDisplayName = (sort: SortBy): string => {
     switch (sort) {
@@ -128,108 +159,26 @@ export const CurrentGameTab: VFC<CurrentGameTabProps> = ({
 
   // Determine which game and achievements to display
   const displayGame = viewMode === "current" ? currentGame : 
-    (trackedGame ? { ...trackedGame, is_running: false, has_achievements: true } as GameInfo : null);
+    (enhancedTrackedGame || (trackedGame ? { ...trackedGame, is_running: false, has_achievements: true } as GameInfo : null));
   const displayAchievements = viewMode === "current" ? achievements : trackedGameAchievements;
 
   return (
     <div style={{ padding: "0", margin: "0" }}>
-      {/* View Toggle - show when we have both options */}
-      {(currentGame || trackedGame) && (
-        <PanelSection>
-          <PanelSectionRow>
-            <div style={{ display: "flex", gap: "4px" }}>
-              {currentGame && (
-                <DialogButton
-                  style={{ 
-                    flex: 1,
-                    fontSize: "12px",
-                    padding: "8px",
-                    backgroundColor: viewMode === "current" ? "rgba(255,255,255,0.15)" : "transparent"
-                  }}
-                  onClick={() => setViewMode("current")}
-                >
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "4px" }}>
-                    <FaGamepad size={12} />
-                    <span>Current Game</span>
-                  </div>
-                </DialogButton>
-              )}
-              {trackedGame && (
-                <DialogButton
-                  style={{ 
-                    flex: 1,
-                    fontSize: "12px",
-                    padding: "8px",
-                    backgroundColor: viewMode === "tracked" ? "rgba(255,255,255,0.15)" : "transparent"
-                  }}
-                  onClick={() => setViewMode("tracked")}
-                >
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "4px" }}>
-                    <FaEye size={12} />
-                    <span>Tracked Game</span>
-                  </div>
-                </DialogButton>
-              )}
-            </div>
-          </PanelSectionRow>
-        </PanelSection>
-      )}
-
       {/* Game Banner */}
       <GameBanner 
         game={displayGame}
         isLoading={isLoading}
         onRefresh={handleRefresh}
+        trackedGame={trackedGame}
+        installedGames={installedGames}
+        onSetTrackedGame={onSetTrackedGame}
+        onClearTrackedGame={onClearTrackedGame}
+        onSelectTrackedGame={handleSelectTrackedGame}
+        viewMode={viewMode}
+        currentGame={currentGame}
+        onViewModeChange={setViewMode}
       />
 
-      {/* No Game / Tracked Game Selection */}
-      {!displayGame && (
-        <PanelSection>
-          <PanelSectionRow>
-            <div style={{ textAlign: "center", opacity: 0.6, padding: "20px", fontSize: "14px" }}>
-              {viewMode === "current" ? "No game currently running" : "No game selected for tracking"}
-            </div>
-          </PanelSectionRow>
-          {viewMode === "tracked" && (
-            <PanelSectionRow>
-              <ButtonItem
-                layout="below"
-                onClick={handleSelectTrackedGame}
-              >
-                <div style={{ fontSize: "14px" }}>
-                  Select Game to Track
-                </div>
-              </ButtonItem>
-            </PanelSectionRow>
-          )}
-        </PanelSection>
-      )}
-
-      {/* Tracked Game Management */}
-      {viewMode === "tracked" && trackedGame && (
-        <PanelSection>
-          <PanelSectionRow>
-            <ButtonItem
-              layout="below"
-              onClick={handleSelectTrackedGame}
-            >
-              <div style={{ fontSize: "14px" }}>
-                Change Tracked Game
-              </div>
-            </ButtonItem>
-          </PanelSectionRow>
-          <PanelSectionRow>
-            <ButtonItem
-              layout="below"
-              onClick={onClearTrackedGame}
-            >
-              <div style={{ fontSize: "14px" }}>
-                Clear Tracked Game
-              </div>
-            </ButtonItem>
-          </PanelSectionRow>
-        </PanelSection>
-      )}
 
       {/* Achievement Progress */}
       {displayAchievements && !displayAchievements.error && (
@@ -243,20 +192,42 @@ export const CurrentGameTab: VFC<CurrentGameTabProps> = ({
         </PanelSection>
       )}
 
-      {/* Filters and Sort */}
+      {/* Collapsible Filters and Sort */}
       {displayAchievements && !displayAchievements.error && displayAchievements.total > 0 && (
-        <PanelSection title="Filters">
+        <PanelSection>
           <PanelSectionRow>
             <ButtonItem
               layout="below"
-              onClick={cycleSortBy}
+              onClick={() => setFiltersExpanded(!filtersExpanded)}
             >
-              <div style={{ fontSize: "14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span>Sort: {getSortDisplayName(sortBy)}</span>
-                <span style={{ fontSize: "12px", opacity: 0.6 }}>→</span>
+              <div style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                fontSize: "14px",
+                width: "100%"
+              }}>
+                <span style={{ fontWeight: "500" }}>
+                  Filters & Sort
+                </span>
+                {filtersExpanded ? <FaChevronUp size={12} /> : <FaChevronDown size={12} />}
               </div>
             </ButtonItem>
           </PanelSectionRow>
+          
+          {filtersExpanded && (
+            <>
+              <PanelSectionRow>
+                <ButtonItem
+                  layout="below"
+                  onClick={cycleSortBy}
+                >
+                  <div style={{ fontSize: "14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <span>Sort: {getSortDisplayName(sortBy)}</span>
+                    <span style={{ fontSize: "12px", opacity: 0.6 }}>→</span>
+                  </div>
+                </ButtonItem>
+              </PanelSectionRow>
           
           <PanelSectionRow>
             <ButtonItem
@@ -317,13 +288,15 @@ export const CurrentGameTab: VFC<CurrentGameTabProps> = ({
               </div>
             </ButtonItem>
           </PanelSectionRow>
+            </>
+          )}
         </PanelSection>
       )}
 
       {/* Achievement List */}
       {displayAchievements && !displayAchievements.error && displayAchievements.total > 0 && (
         <PanelSection title="Achievements">
-          <div style={{ maxHeight: "350px", overflowY: "auto", overflowX: "hidden" }}>
+          <div style={{ maxHeight: "400px", overflowY: "auto", overflowX: "hidden" }}>
             <AchievementList
               achievements={displayAchievements.achievements}
               sortBy={sortBy}
@@ -349,13 +322,14 @@ export const CurrentGameTab: VFC<CurrentGameTabProps> = ({
       )}
       
       {/* Loading indicator */}
-      {isLoading && (
+      {isLoading && loadingMessage && loadingMessage.trim() && (
         <PanelSection>
           <PanelSectionRow>
             <LoadingSpinner message={loadingMessage} size="small" />
           </PanelSectionRow>
         </PanelSection>
       )}
+      
     </div>
   );
 };

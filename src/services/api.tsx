@@ -26,3 +26,5 @@ export const saveAutoRefreshBackend = callable<[enabled: boolean], boolean>("set
 export const setTrackedGame = callable<[app_id: number, name: string], boolean>("set_tracked_game");
 export const clearTrackedGame = callable<[], boolean>("clear_tracked_game");
 export const getInstalledGames = callable<[], GameInfo[]>("get_installed_games");
+export const getGameArtwork = callable<[app_id: number], Record<string, string | null>>("get_game_artwork");
+export const getGameInfo = callable<[app_id: number], GameInfo>("get_game_info");

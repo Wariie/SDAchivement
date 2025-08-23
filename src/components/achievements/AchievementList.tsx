@@ -1,10 +1,8 @@
 // components/achievements/AchievementList.tsx
 import { VFC, useMemo } from "react";
-import { Focusable } from "@decky/ui";
 import { AchievementListProps, Achievement } from "../../models";
 import { AchievementItem } from "./AchievementItem";
 import { AchievementDetailsModal } from "./AchievementDetailsModal";
-import { LoadingSpinner } from "../common/LoadingSpinner";
 import { showModal } from "@decky/ui";
 
 export const AchievementList: VFC<AchievementListProps> = ({ 
@@ -72,28 +70,35 @@ export const AchievementList: VFC<AchievementListProps> = ({
     );
   };
 
-  if (isLoading) {
-    return <LoadingSpinner message="Loading achievements..." size="small" />;
+  // Loading is handled by parent component, no need for duplicate spinner
+  if (isLoading && !achievements?.length) {
+    return null; // Let parent handle loading display
   }
 
   if (!sortedAchievements.length) {
+    // Only show message if we have achievements but they're filtered out
+    const hasAchievements = achievements && achievements.length > 0;
+    if (!hasAchievements) {
+      return null; // Don't show anything if no achievements at all
+    }
+    
     return (
       <div style={{ 
         textAlign: "center", 
         opacity: 0.6, 
-        padding: "20px",
-        fontSize: "14px"
+        padding: "12px 8px",
+        fontSize: "12px"
       }}>
-        No achievements found
+        No achievements match current filters
       </div>
     );
   }
 
   return (
-    <Focusable style={{ 
+    <div style={{ 
       display: "flex", 
       flexDirection: "column", 
-      gap: 0, 
+      gap: "1px", 
       padding: 0, 
       margin: 0 
     }}>
@@ -104,6 +109,6 @@ export const AchievementList: VFC<AchievementListProps> = ({
           onClick={() => handleAchievementClick(achievement)}
         />
       ))}
-    </Focusable>
+    </div>
   );
 };

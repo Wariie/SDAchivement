@@ -60,10 +60,12 @@ export const useSettings = (): UseSettingsReturn => {
         lastSavedInterval.current = result.refresh_interval ?? 30;
         if (result.test_app_id) {
           setTestGameId(result.test_app_id.toString());
+        } else {
+          setTestGameId("");
         }
-        if (result.tracked_game) {
-          setTrackedGame(result.tracked_game);
-        }
+        
+        // Always set tracked game (including null/undefined to clear it)
+        setTrackedGame(result.tracked_game || null);
         setSettingsLoaded(true);
       }
     } catch (error) {
@@ -222,11 +224,13 @@ export const useSettings = (): UseSettingsReturn => {
         lastSavedInterval.current = reloaded.refresh_interval ?? 30;
         if (reloaded.test_app_id) {
           setTestGameId(reloaded.test_app_id.toString());
+        } else {
+          setTestGameId("");
         }
-        if (reloaded.tracked_game) {
-          setTrackedGame(reloaded.tracked_game);
-        }
-        setSettingsLoaded(false);
+        
+        // Always set tracked game (including null/undefined to clear it)
+        setTrackedGame(reloaded.tracked_game || null);
+        setSettingsLoaded(true);
         toaster.toast({
           title: "Settings Reloaded",
           body: "Settings have been reloaded from disk"

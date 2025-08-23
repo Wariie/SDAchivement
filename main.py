@@ -251,7 +251,22 @@ class Plugin:
 
     async def clear_tracked_game(self) -> bool:
         """Clear tracked game"""
-        return await self.settings_service.clear_tracked_game()
+        try:
+            decky.logger.info("Main: Clearing tracked game...")
+            success = await self.settings_service.clear_tracked_game()
+            
+            if success:
+                decky.logger.info("Main: Tracked game cleared successfully, reloading settings...")
+                # Force reload settings to ensure our internal state is updated
+                await self.settings_service.load()
+                decky.logger.info("Main: Settings reloaded after clearing tracked game")
+            else:
+                decky.logger.error("Main: Failed to clear tracked game")
+            
+            return success
+        except Exception as e:
+            decky.logger.error(f"Main: Error in clear_tracked_game: {e}")
+            return False
 
     async def set_refresh_interval(self, interval: int) -> bool:
         """Set and save the auto-refresh interval"""
@@ -311,6 +326,23 @@ class Plugin:
     async def get_installed_games(self) -> List[Dict]:
         """Get locally installed Steam games by scanning installation files"""
         return await self.steam_scanner.get_installed_games()
+    
+    async def get_game_artwork(self, app_id: int) -> Dict:
+        """Get game artwork paths (grid, hero, logo, icon)"""
+        try:
+            artwork = self.steam_scanner.get_game_artwork(app_id)
+            if not artwork or not isinstance(artwork, dict):
+                decky.logger.warning(f"No artwork found for app {app_id}")
+                return {"grid": None, "hero": None, "logo": None, "icon": None}
+            
+            # Convert Path objects to strings for JSON serialization
+            result = {}
+            for key, path in artwork.items():
+                result[key] = str(path) if path else None
+            return result
+        except Exception as e:
+            decky.logger.error(f"Failed to get game artwork for {app_id}: {e}")
+            return {"grid": None, "hero": None, "logo": None, "icon": None}
     
     # ==================== Achievement Functions ====================
     

@@ -18,7 +18,7 @@ import { useSettings } from "./hooks/useSettings";
 import { useAchievements } from "./hooks/useAchievements";
 
 // Import services
-import { getCurrentGame, getAchievements, setTrackedGame, clearTrackedGame, getInstalledGames } from "./services/api";
+import { getCurrentGame, getAchievements, setTrackedGame as setTrackedGameAPI, clearTrackedGame, getInstalledGames } from "./services/api";
 
 // Main Content Component
 const Content: VFC = () => {
@@ -27,6 +27,7 @@ const Content: VFC = () => {
   const [trackedGame, setTrackedGame] = useState<TrackedGame | null>(null);
   const [trackedGameAchievements, setTrackedGameAchievements] = useState<AchievementData | null>(null);
   const [installedGames, setInstalledGames] = useState<GameInfo[]>([]);
+  const [isClearingTrackedGame, setIsClearingTrackedGame] = useState(false);
 
   // Custom hooks
   const settings = useSettings();
@@ -98,7 +99,10 @@ const Content: VFC = () => {
         await settings.loadPluginSettings();
         
         // Log tracked game for debugging
-        console.log("Loaded tracked game from settings:", settings.trackedGame);
+        console.log("===== TRACKED GAME DEBUG =====");
+        console.log("settings.trackedGame:", settings.trackedGame);
+        console.log("settings.settingsLoaded:", settings.settingsLoaded);
+        console.log("==============================");
         
         // Load tracked game from settings after settings are loaded
         if (settings.trackedGame) {
@@ -163,7 +167,48 @@ const Content: VFC = () => {
       
       return () => clearInterval(interval);
     }
+    // Return undefined explicitly when no cleanup is needed
+    return undefined;
   }, [settings.autoRefresh, settings.refreshInterval, currentTab, fetchCurrentGame, achievements.fetchAchievements]);
+
+  // Sync tracked game from settings
+  useEffect(() => {
+    // Only sync if settings are loaded and we're not actively clearing
+    if (!settings.settingsLoaded || isClearingTrackedGame) {
+      console.log("Settings not loaded yet or clearing in progress, skipping sync");
+      return;
+    }
+    
+    console.log("=== TRACKED GAME SYNC ===");
+    console.log("settings.trackedGame:", settings.trackedGame);
+    console.log("current trackedGame:", trackedGame);
+    console.log("isClearingTrackedGame:", isClearingTrackedGame);
+    console.log("========================");
+    
+    if (settings.trackedGame && (!trackedGame || settings.trackedGame.app_id !== trackedGame.app_id)) {
+      console.log("Syncing tracked game from settings:", settings.trackedGame);
+      setTrackedGame(settings.trackedGame);
+      
+      // Also load achievements if we don't have them
+      if (!trackedGameAchievements) {
+        const loadTrackedAchievements = async () => {
+          try {
+            const result = await getAchievements(settings.trackedGame!.app_id);
+            if (result && !result.error) {
+              setTrackedGameAchievements(result);
+            }
+          } catch (error) {
+            console.error("Failed to load tracked game achievements:", error);
+          }
+        };
+        loadTrackedAchievements();
+      }
+    } else if (!settings.trackedGame && trackedGame) {
+      console.log("Clearing tracked game - not in settings");
+      setTrackedGame(null);
+      setTrackedGameAchievements(null);
+    }
+  }, [settings.trackedGame, settings.settingsLoaded, trackedGame, trackedGameAchievements, isClearingTrackedGame]);
 
   // Tab change handler
   const handleTabChange = (tab: Tab) => {
@@ -203,12 +248,16 @@ const Content: VFC = () => {
             console.log(`Loaded ${installedGamesList.length} installed games as fallback`);
           } else {
             // Use perfect games as final fallback
-            setInstalledGames(achievements.overallProgress.perfect_games.slice(0, 50));
-            console.log(`Final fallback: using ${achievements.overallProgress.perfect_games.slice(0, 50).length} perfect games`);
+            if (achievements.overallProgress?.perfect_games) {
+              setInstalledGames(achievements.overallProgress.perfect_games.slice(0, 50));
+              console.log(`Final fallback: using ${achievements.overallProgress.perfect_games.slice(0, 50).length} perfect games`);
+            }
           }
         } catch (error) {
           console.error("Fallback scan failed, using perfect games:", error);
-          setInstalledGames(achievements.overallProgress.perfect_games.slice(0, 50));
+          if (achievements.overallProgress?.perfect_games) {
+            setInstalledGames(achievements.overallProgress.perfect_games.slice(0, 50));
+          }
         }
       };
       
@@ -218,15 +267,25 @@ const Content: VFC = () => {
 
   // Tracked game handlers
   const handleSetTrackedGame = async (game: TrackedGame) => {
+    console.log("Setting tracked game:", game);
     try {
-      const success = await setTrackedGame(game.app_id, game.name);
+      const success = await setTrackedGameAPI(game.app_id, game.name);
+      console.log("setTrackedGameAPI result:", success);
       if (success) {
-        setTrackedGame(game);
+        setTrackedGame(game); // This is the state setter, not the API function
+        console.log("Local state updated, now fetching achievements...");
         // Also fetch achievements for the newly tracked game
         const result = await getAchievements(game.app_id);
         if (result && !result.error) {
           setTrackedGameAchievements(result);
+          console.log("Tracked game achievements loaded");
         }
+        // Reload settings to ensure persistence
+        console.log("Reloading settings to sync persistence...");
+        await settings.loadPluginSettings();
+        console.log("Settings reloaded, new tracked game:", settings.trackedGame);
+      } else {
+        console.error("Failed to save tracked game to backend");
       }
     } catch (error) {
       console.error("Failed to save tracked game:", error);
@@ -235,13 +294,36 @@ const Content: VFC = () => {
 
   const handleClearTrackedGame = async () => {
     try {
+      console.log("Clearing tracked game...");
+      
+      // Set clearing flag to prevent sync interference
+      setIsClearingTrackedGame(true);
+      
       const success = await clearTrackedGame();
+      console.log("clearTrackedGame API result:", success);
+      
       if (success) {
+        console.log("API success, clearing local state and reloading settings...");
+        
+        // Clear local state
         setTrackedGame(null);
         setTrackedGameAchievements(null);
+        
+        // Force reload settings to sync with backend
+        console.log("Reloading settings from backend...");
+        await settings.loadPluginSettings();
+        
+        console.log("Tracked game cleared successfully");
+      } else {
+        console.error("Clear tracked game API returned false");
       }
+      
     } catch (error) {
       console.error("Failed to clear tracked game:", error);
+    } finally {
+      // Always clear the flag after operation
+      console.log("Clearing the isClearingTrackedGame flag");
+      setIsClearingTrackedGame(false);
     }
   };
 
@@ -305,14 +387,17 @@ const Content: VFC = () => {
     }
   };
 
+
   return (
-    <>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <TabNavigation 
         currentTab={currentTab} 
         onTabChange={handleTabChange} 
       />
-      {renderTabContent()}
-    </>
+      <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+        {renderTabContent()}
+      </div>
+    </div>
   );
 };
 

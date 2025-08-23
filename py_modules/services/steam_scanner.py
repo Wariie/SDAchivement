@@ -197,3 +197,5 @@ class SteamScannerService:
                 fallback = cache_path / f"{app_id}_{key}.jpg"
                 if fallback.exists():
                     artwork[key] = fallback
+        
+        return artwork

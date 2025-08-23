@@ -5,12 +5,14 @@ import {
   PanelSectionRow, 
   ButtonItem, 
   Focusable,
-  Navigation
+  Navigation,
+  showModal
 } from "@decky/ui";
 import { FaSync, FaStar } from "react-icons/fa";
-import { RecentAchievement } from "../../models";
+import { RecentAchievement, Achievement } from "../../models";
 import { formatTime, formatGlobalPercent } from "../../services/formatters";
 import { LoadingSpinner } from "../common/LoadingSpinner";
+import { AchievementDetailsModal } from "../achievements/AchievementDetailsModal";
 
 interface RecentTabProps {
   recentAchievements: RecentAchievement[];
@@ -25,6 +27,27 @@ export const RecentTab: VFC<RecentTabProps> = ({
 }) => {
   const handleNavigateToGame = (gameId: number) => {
     Navigation.NavigateToSteamWeb(`https://store.steampowered.com/app/${gameId}`);
+  };
+
+  const convertRecentToAchievement = (recent: RecentAchievement): Achievement => {
+    return {
+      api_name: recent.achievement_name.toLowerCase().replace(/[^a-z0-9]/g, '_'),
+      display_name: recent.achievement_name,
+      description: recent.achievement_desc,
+      icon: recent.icon,
+      icon_gray: recent.icon, // Recent achievements are always unlocked, so use same icon
+      hidden: false, // Recent achievements are never hidden since they're unlocked
+      unlocked: true, // Recent achievements are always unlocked
+      unlock_time: recent.unlock_time,
+      global_percent: recent.global_percent
+    };
+  };
+
+  const handleAchievementClick = (recent: RecentAchievement) => {
+    const achievement = convertRecentToAchievement(recent);
+    showModal(
+      <AchievementDetailsModal achievement={achievement} />
+    );
   };
 
 
@@ -55,7 +78,7 @@ export const RecentTab: VFC<RecentTabProps> = ({
               <PanelSectionRow key={`${ach.game_id}_${ach.unlock_time}_${index}`}>
                 <ButtonItem
                   layout="below"
-                  onClick={() => handleNavigateToGame(ach.game_id)}
+                  onClick={() => handleAchievementClick(ach)}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "4px 0" }}>
                     {ach.icon && (

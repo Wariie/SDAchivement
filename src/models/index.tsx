@@ -95,6 +95,16 @@ export interface GameBannerProps {
   game: GameInfo | null;
   isLoading: boolean;
   onRefresh: () => void;
+  // Tracking functionality
+  trackedGame?: TrackedGame | null;
+  installedGames?: GameInfo[];
+  onSetTrackedGame?: (game: TrackedGame) => Promise<void>;
+  onClearTrackedGame?: () => Promise<void>;
+  onSelectTrackedGame?: () => void;
+  viewMode?: "current" | "tracked";
+  // View mode toggle
+  currentGame?: GameInfo | null;
+  onViewModeChange?: (mode: "current" | "tracked") => void;
 }
 
 export interface TabNavigationProps {

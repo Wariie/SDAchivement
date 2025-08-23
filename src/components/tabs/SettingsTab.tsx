@@ -14,7 +14,7 @@ import {
 import { FaKey, FaSync, FaEye } from "react-icons/fa";
 import { toaster } from "@decky/api";
 import { UseSettingsReturn } from "../../hooks/useSettings";
-import { refreshCache, setTrackedGame, clearTrackedGame } from "../../services/api";
+import { refreshCache } from "../../services/api";
 import { GameSelectionModal } from "../game/GameSelectionModal";
 import { GameInfo, TrackedGame } from "../../models";
 
@@ -296,7 +296,19 @@ export const SettingsTab: VFC<SettingsTabProps> = ({
           <PanelSectionRow>
             <ButtonItem
               layout="below"
-              onClick={onClearTrackedGame}
+              onClick={async () => {
+                console.log("SettingsTab: Clear tracked game clicked");
+                if (onClearTrackedGame) {
+                  try {
+                    await onClearTrackedGame();
+                    console.log("SettingsTab: Clear tracked game completed");
+                  } catch (error) {
+                    console.error("SettingsTab: Clear tracked game failed:", error);
+                  }
+                } else {
+                  console.error("SettingsTab: onClearTrackedGame is not defined");
+                }
+              }}
             >
               <div style={{ fontSize: "14px" }}>
                 Clear Tracked Game
