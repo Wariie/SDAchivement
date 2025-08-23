@@ -4,6 +4,7 @@ import { AchievementListProps, Achievement } from "../../models";
 import { AchievementItem } from "./AchievementItem";
 import { AchievementDetailsModal } from "./AchievementDetailsModal";
 import { showModal } from "@decky/ui";
+import { LoadingSpinner } from "../common/LoadingSpinner";
 
 export const AchievementList: VFC<AchievementListProps> = ({ 
   achievements, 
@@ -71,8 +72,9 @@ export const AchievementList: VFC<AchievementListProps> = ({
   };
 
   // Loading is handled by parent component, no need for duplicate spinner
-  if (isLoading && !achievements?.length) {
-    return null; // Let parent handle loading display
+  if (isLoading) {
+    return <LoadingSpinner message="Loading achievements..." size="small" />;
+    // Let parent handle loading display
   }
 
   if (!sortedAchievements.length) {

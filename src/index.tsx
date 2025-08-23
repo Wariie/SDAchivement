@@ -177,14 +177,7 @@ const Content: VFC = () => {
     if (!settings.settingsLoaded || isClearingTrackedGame) {
       console.log("Settings not loaded yet or clearing in progress, skipping sync");
       return;
-    }
-    
-    console.log("=== TRACKED GAME SYNC ===");
-    console.log("settings.trackedGame:", settings.trackedGame);
-    console.log("current trackedGame:", trackedGame);
-    console.log("isClearingTrackedGame:", isClearingTrackedGame);
-    console.log("========================");
-    
+    }    
     if (settings.trackedGame && (!trackedGame || settings.trackedGame.app_id !== trackedGame.app_id)) {
       console.log("Syncing tracked game from settings:", settings.trackedGame);
       setTrackedGame(settings.trackedGame);
