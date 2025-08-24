@@ -1,9 +1,10 @@
 // components/game/GameBanner.tsx
 import { VFC } from "react";
 import { PanelSection, PanelSectionRow, ButtonItem } from "@decky/ui";
-import { FaGamepad, FaSync, FaEye, FaTimes, FaPlus } from "react-icons/fa";
+import { FaGamepad, FaSync, FaEye, FaTimes, FaPlus, FaPlay, FaBullseye } from "../../utils/icons";
 import { GameBannerProps } from "../../models";
 import { useGameArtwork } from "../../hooks/useGameArtwork";
+import { formatPlaytime } from "../../services/formatters";
 
 export const GameBanner: VFC<GameBannerProps> = ({ 
   game, 
@@ -103,128 +104,128 @@ export const GameBanner: VFC<GameBannerProps> = ({
           background: "linear-gradient(to right, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.3) 100%)"
         }} />
         
+        {/* Top Left Pills - Only Test Mode */}
+        {isTestMode && (
+          <div style={{
+            position: "absolute",
+            top: "8px",
+            left: "8px",
+            zIndex: 10
+          }}>
+            <span style={{
+              backgroundColor: "#ff6b6b",
+              color: "white",
+              padding: "2px 8px",
+              borderRadius: "12px",
+              fontSize: "10px",
+              fontWeight: "bold",
+              textShadow: "none"
+            }}>
+              TEST
+            </span>
+          </div>
+        )}
+
+        {/* Top Right Visual Toggle */}
+        {trackedGame && currentGame && onViewModeChange && trackedGame.app_id !== currentGame.app_id && (
+          <div
+            style={{
+              position: "absolute",
+              top: "8px",
+              right: "8px",
+              display: "flex",
+              backgroundColor: "rgba(0,0,0,0.4)",
+              borderRadius: "16px",
+              padding: "2px",
+              border: "1px solid rgba(255,255,255,0.2)",
+              cursor: "pointer",
+              transition: "all 0.3s ease",
+              zIndex: 10
+            }}
+            onClick={() => onViewModeChange(viewMode === "current" ? "tracked" : "current")}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "rgba(0,0,0,0.6)";
+              e.currentTarget.style.borderColor = "rgba(255,255,255,0.4)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "rgba(0,0,0,0.4)";
+              e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)";
+            }}
+          >
+            {/* Current Mode Option */}
+            <div
+              style={{
+                padding: "6px 8px",
+                borderRadius: "12px",
+                backgroundColor: viewMode === "current" ? "rgba(76, 175, 80, 0.8)" : "transparent",
+                color: viewMode === "current" ? "white" : "rgba(255,255,255,0.6)",
+                transition: "all 0.3s ease",
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+                fontSize: "10px",
+                fontWeight: "bold",
+                textShadow: viewMode === "current" ? "0 1px 2px rgba(0,0,0,0.5)" : "none"
+              }}
+            >
+              <FaPlay style={{ fontSize: "8px" }} />
+              <span>LIVE</span>
+            </div>
+            
+            {/* Tracked Mode Option */}
+            <div
+              style={{
+                padding: "6px 8px",
+                borderRadius: "12px",
+                backgroundColor: viewMode === "tracked" ? "rgba(33, 150, 243, 0.8)" : "transparent",
+                color: viewMode === "tracked" ? "white" : "rgba(255,255,255,0.6)",
+                transition: "all 0.3s ease",
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+                fontSize: "10px",
+                fontWeight: "bold",
+                textShadow: viewMode === "tracked" ? "0 1px 2px rgba(0,0,0,0.5)" : "none"
+              }}
+            >
+              <FaBullseye style={{ fontSize: "8px" }} />
+              <span>TRACK</span>
+            </div>
+          </div>
+        )}
+
         {/* Content */}
         <div style={{
           position: "relative",
           padding: "12px 16px",
+          paddingRight: (trackedGame && currentGame && onViewModeChange && trackedGame.app_id !== currentGame.app_id) ? "100px" : "16px",
           height: "80px",
           display: "flex",
           flexDirection: "column",
           justifyContent: "center",
           color: "white"
         }}>
-          <div style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-            marginBottom: "4px"
+          <h3 style={{
+            margin: "0 0 4px 0",
+            fontSize: "16px",
+            fontWeight: "bold",
+            textShadow: "1px 1px 2px rgba(0,0,0,0.7)"
           }}>
-            <h3 style={{
-              margin: 0,
-              fontSize: "16px",
-              fontWeight: "bold",
-              textShadow: "1px 1px 2px rgba(0,0,0,0.7)",
-              flex: 1
-            }}>
-              {displayName}
-            </h3>
-            
-            {/* Mode indicators */}
-            <div style={{ display: "flex", gap: "4px" }}>
-              {/* Test mode indicator */}
-              {isTestMode && (
-                <span style={{
-                  backgroundColor: "#ff6b6b",
-                  color: "white",
-                  padding: "2px 8px",
-                  borderRadius: "12px",
-                  fontSize: "10px",
-                  fontWeight: "bold",
-                  textShadow: "none"
-                }}>
-                  TEST
-                </span>
-              )}
-              
-              {/* Tracked game indicator - only show when games are different */}
-              {viewMode === "tracked" && trackedGame && onViewModeChange && currentGame && 
-               trackedGame.app_id !== currentGame.app_id && (
-                <span 
-                  style={{
-                    backgroundColor: "#2196F3",
-                    color: "white",
-                    padding: "2px 8px",
-                    borderRadius: "12px",
-                    fontSize: "10px",
-                    fontWeight: "bold",
-                    textShadow: "none",
-                    cursor: "pointer"
-                  }}
-                  onClick={() => onViewModeChange("current")}
-                >
-                  TRACKED
-                </span>
-              )}
-              
-              {/* Current game indicator - only show when games are different */}
-              {viewMode === "current" && currentGame && trackedGame && onViewModeChange && 
-               trackedGame.app_id !== currentGame.app_id && (
-                <span 
-                  style={{
-                    backgroundColor: "#4CAF50",
-                    color: "white",
-                    padding: "2px 8px",
-                    borderRadius: "12px",
-                    fontSize: "10px",
-                    fontWeight: "bold",
-                    textShadow: "none",
-                    cursor: "pointer"
-                  }}
-                  onClick={() => onViewModeChange("tracked")}
-                >
-                  CURRENT
-                </span>
-              )}
-            </div>
-          </div>
+            {displayName}
+          </h3>
           
-          {game.has_achievements && (
-            <div style={{
-              fontSize: "12px",
-              opacity: 0.9,
-              textShadow: "1px 1px 1px rgba(0,0,0,0.5)"
-            }}>
-              {game.achievements} achievements available
-            </div>
-          )}
-        </div>
-        
-        {/* Action Button */}
-        <div
-          style={{
-            position: "absolute",
-            top: "8px",
-            right: "8px",
-            padding: "6px",
-            borderRadius: "4px",
-            backgroundColor: "rgba(255,255,255,0.2)",
-            border: "1px solid rgba(255,255,255,0.3)",
-            cursor: isLoading ? "not-allowed" : "pointer",
-            opacity: isLoading ? 0.5 : 1,
-            transition: "all 0.2s ease",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center"
-          }}
-          onClick={isLoading ? undefined : onRefresh}
-        >
-          <FaSync 
-            style={{ 
-              fontSize: "12px", 
-              color: "white",
-              animation: isLoading ? "spin 1s linear infinite" : "none"
-            }} 
-          />
+          <div style={{ fontSize: "12px", opacity: 0.9, textShadow: "1px 1px 1px rgba(0,0,0,0.5)" }}>
+            {/* Always show achievement count if available */}
+            {((game.achievement_count && game.achievement_count > 0) || 
+              (game.achievements && game.achievements > 0) || 
+              game.has_achievements) && (
+              <div>{game.achievement_count || game.achievements || 0} achievements available</div>
+            )}
+            {/* Show playtime if available */}
+            {game.playtime_forever !== undefined && game.playtime_forever >= 0 && (
+              <div>Playtime: {formatPlaytime(game.playtime_forever)}</div>
+            )}
+          </div>
         </div>
       </div>
       
@@ -282,11 +283,9 @@ export const GameBanner: VFC<GameBannerProps> = ({
                 <ButtonItem
                   layout="below"
                   onClick={async () => {
-                    console.log("GameBanner: Clear tracked game clicked");
                     if (onClearTrackedGame) {
                       try {
                         await onClearTrackedGame();
-                        console.log("GameBanner: Clear tracked game completed");
                       } catch (error) {
                         console.error("GameBanner: Clear tracked game failed:", error);
                       }

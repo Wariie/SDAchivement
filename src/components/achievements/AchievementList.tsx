@@ -9,6 +9,7 @@ import { LoadingSpinner } from "../common/LoadingSpinner";
 export const AchievementList: VFC<AchievementListProps> = ({ 
   achievements, 
   sortBy, 
+  sortOrder = "desc",
   showHidden, 
   filterRarity,
   showUnlockedOnly = false,
@@ -43,27 +44,35 @@ export const AchievementList: VFC<AchievementListProps> = ({
     
     // Sort
     filtered.sort((a, b) => {
+      let compareResult = 0;
+      
       switch (sortBy) {
         case "name":
-          return a.display_name.localeCompare(b.display_name);
+          compareResult = a.display_name.localeCompare(b.display_name);
+          break;
         case "rarity":
           const aPercent = (a.global_percent !== null && !isNaN(a.global_percent)) ? a.global_percent : 100;
           const bPercent = (b.global_percent !== null && !isNaN(b.global_percent)) ? b.global_percent : 100;
-          return aPercent - bPercent;
+          compareResult = aPercent - bPercent;
+          break;
         case "unlock":
         default:
           // Unlocked first, then by time
-          if (a.unlocked && !b.unlocked) return -1;
-          if (!a.unlocked && b.unlocked) return 1;
-          if (a.unlocked && b.unlocked) {
-            return (b.unlock_time || 0) - (a.unlock_time || 0);
+          if (a.unlocked && !b.unlocked) compareResult = -1;
+          else if (!a.unlocked && b.unlocked) compareResult = 1;
+          else if (a.unlocked && b.unlocked) {
+            compareResult = (b.unlock_time || 0) - (a.unlock_time || 0);
           }
-          return 0;
+          else compareResult = 0;
+          break;
       }
+      
+      // Apply sort order (reverse for ascending)
+      return sortOrder === "asc" ? -compareResult : compareResult;
     });
     
     return filtered;
-  }, [achievements, sortBy, showHidden, filterRarity, showUnlockedOnly, showLockedOnly]);
+  }, [achievements, sortBy, sortOrder, showHidden, filterRarity, showUnlockedOnly, showLockedOnly]);
 
   const handleAchievementClick = (achievement: Achievement) => {
     showModal(

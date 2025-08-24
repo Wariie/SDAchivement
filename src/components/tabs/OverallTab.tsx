@@ -1,30 +1,119 @@
 // components/tabs/OverallTab.tsx
-import { VFC } from "react";
+import { VFC, memo } from "react";
 import { PanelSection, PanelSectionRow, ButtonItem, Focusable, showModal, ConfirmModal } from "@decky/ui";
-import { FaChartLine, FaSync, FaTrophy } from "react-icons/fa";
+import { FaChartLine, FaSync, FaTrophy } from "../../utils/icons";
 import { OverallProgress, GameInfo } from "../../models";
 import { ProgressDisplay } from "../common/ProgressDisplay";
 import { LoadingSpinner } from "../common/LoadingSpinner";
-import { getMilestoneInfo } from "../../services/formatters";
+import { GameImage } from "../common/GameImage";
+import { getMilestoneInfo, formatPlaytime } from "../../services/formatters";
 import { useGameArtwork } from "../../hooks/useGameArtwork";
+import { modalStyles } from "../../utils/modalStyles";
 
 interface OverallTabProps {
   overallProgress: OverallProgress | null;
+  recentlyPlayedGames: GameInfo[];
   isLoading: boolean;
   onFetchProgress: () => Promise<void>;
+  onFetchRecentlyPlayed: () => Promise<void>;
   onGameClick?: (gameId: number) => void;
 }
 
-// Enhanced Perfect Game Modal Component
-const PerfectGameModal: VFC<{ game: GameInfo; closeModal?: () => void }> = ({ game, closeModal }) => {
+// Perfect Game List Item Component
+const PerfectGameListItem: VFC<{ game: GameInfo }> = memo(({ game }) => {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "4px 0" }}>
+      <GameImage
+        appId={game.app_id}
+        headerImage={game.header_image}
+        alt={game.name}
+        style={{
+          width: "60px",
+          height: "28px",
+          objectFit: "cover",
+          borderRadius: "4px",
+          flexShrink: 0
+        }}
+        fallbackIcon={<FaTrophy style={{ color: "#FFD700", fontSize: "16px", flexShrink: 0 }} />}
+      />
+      <div style={{ flex: 1 }}>
+        <div style={{ fontWeight: "bold", fontSize: "14px" }}>{game.name}</div>
+        <div style={{ fontSize: "12px", opacity: 0.7 }}>
+          {game.achievements} achievements
+        </div>
+      </div>
+      <span style={{ color: "#4CAF50", fontWeight: "bold", fontSize: "13px" }}>100%</span>
+    </div>
+  );
+});
+
+// Recently Played Game List Item Component
+const RecentlyPlayedGameListItem: VFC<{ game: GameInfo }> = ({ game }) => {
   const { getBestImage } = useGameArtwork(game.app_id);
   
-  const formatPlaytime = (minutes?: number): string => {
-    if (!minutes || minutes === 0) return "Not tracked";
-    if (minutes < 60) return `${minutes}m`;
-    const hours = Math.round(minutes / 60 * 10) / 10;
-    return `${hours}h`;
-  };
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "4px 0" }}>
+      {game.img_icon_url ? (
+        <img
+          src={`https://media.steampowered.com/steamcommunity/public/images/apps/${game.app_id}/${game.img_icon_url}.jpg`}
+          alt={game.name}
+          style={{
+            width: "32px",
+            height: "32px",
+            objectFit: "cover",
+            borderRadius: "4px",
+            flexShrink: 0
+          }}
+          onError={(e) => {
+            e.currentTarget.style.display = "none";
+          }}
+        />
+      ) : game.header_image || getBestImage() ? (
+        <img
+          src={getBestImage(game.header_image) || game.header_image}
+          alt={game.name}
+          style={{
+            width: "32px",
+            height: "32px",
+            objectFit: "cover",
+            borderRadius: "4px",
+            flexShrink: 0
+          }}
+          onError={(e) => {
+            e.currentTarget.style.display = "none";
+          }}
+        />
+      ) : (
+        <div style={{ width: "32px", height: "32px", backgroundColor: "#333", borderRadius: "4px", flexShrink: 0 }} />
+      )}
+      <div style={{ flex: 1 }}>
+        <div style={{ fontWeight: "bold", fontSize: "14px" }}>{game.name}</div>
+        <div style={{ fontSize: "12px", opacity: 0.7 }}>
+          {formatPlaytime(game.playtime_forever || 0)}
+          {game.has_achievements && game.total_achievements && game.total_achievements > 0 && (
+            <span style={{ marginLeft: "8px" }}>
+              • {game.unlocked_achievements || 0}/{game.total_achievements} achievements ({game.achievement_percentage?.toFixed(1) || "0"}%)
+            </span>
+          )}
+        </div>
+      </div>
+      {game.playtime_2weeks && game.playtime_2weeks > 0 && (
+        <div style={{ 
+          fontSize: "11px", 
+          opacity: 0.8,
+          textAlign: "right"
+        }}>
+          <div>2 weeks:</div>
+          <div>{formatPlaytime(game.playtime_2weeks)}</div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Recently Played Game Modal Component
+const RecentlyPlayedGameModal: VFC<{ game: GameInfo; closeModal?: () => void }> = ({ game, closeModal }) => {
+  const { getBestImage } = useGameArtwork(game.app_id);
 
   return (
     <ConfirmModal
@@ -34,28 +123,233 @@ const PerfectGameModal: VFC<{ game: GameInfo; closeModal?: () => void }> = ({ ga
       strOKButtonText="Close"
       bHideCloseIcon={false}
     >
-      <div style={{ padding: "0" }}>
+      <div style={modalStyles.container}>
         {/* Hero Image Banner */}
-        <div style={{
-          position: "relative",
-          height: "120px",
-          background: "linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)",
-          borderRadius: "8px 8px 0 0",
-          overflow: "hidden",
-          marginBottom: "15px"
-        }}>
-          {getBestImage(game.header_image) && (
-            <img 
-              src={getBestImage(game.header_image)!}
-              style={{
-                width: "100%",
-                height: "100%",
-                objectFit: "cover",
-                opacity: 0.8
-              }}
-              alt=""
-            />
+        <div style={modalStyles.heroImageBanner}>
+          {(() => {
+            const bestImage = getBestImage(game.header_image);
+            let imageUrl = bestImage || game.header_image;
+            
+            // Fallback to Steam CDN if no image URL
+            if (!imageUrl && game.app_id) {
+              imageUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${game.app_id}/header.jpg`;
+            }
+            
+            return imageUrl ? (
+              <img 
+                src={imageUrl}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  opacity: 0.8
+                }}
+                alt={game.name}
+                onError={(e) => {
+                  // Try fallback Steam CDN URL if the original image failed
+                  const currentSrc = e.currentTarget.src;
+                  const steamCdnUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${game.app_id}/header.jpg`;
+                  
+                  if (currentSrc !== steamCdnUrl && game.app_id) {
+                    e.currentTarget.src = steamCdnUrl;
+                  } else {
+                    e.currentTarget.style.display = "none";
+                  }
+                }}
+              />
+            ) : null;
+          })()}
+          
+          {/* Overlay with gradient */}
+          <div style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.7) 100%)"
+          }} />
+          
+          {/* Title and Status Badge */}
+          <div style={{
+            position: "absolute",
+            bottom: "10px",
+            left: "15px",
+            right: "15px",
+            color: "white"
+          }}>
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: "4px"
+            }}>
+              <h3 style={{
+                margin: 0,
+                fontSize: "18px",
+                fontWeight: "bold",
+                textShadow: "1px 1px 2px rgba(0,0,0,0.8)",
+                flex: 1,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap"
+              }}>
+                {game.name}
+              </h3>
+              <span style={{
+                backgroundColor: "#2196F3",
+                color: "white",
+                padding: "4px 8px",
+                borderRadius: "12px",
+                fontSize: "10px",
+                fontWeight: "bold",
+                marginLeft: "8px"
+              }}>
+                🎮 RECENT
+              </span>
+            </div>
+          </div>
+        </div>
+        
+        {/* Stats Grid */}
+        <div style={{ padding: "0 16px 8px" }}>
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: "12px",
+            marginBottom: "15px"
+          }}>
+            <div style={{
+              backgroundColor: "rgba(255,255,255,0.05)",
+              padding: "12px",
+              borderRadius: "6px",
+              textAlign: "center"
+            }}>
+              <div style={{ fontSize: "20px", fontWeight: "bold", color: "#2196F3" }}>
+                {formatPlaytime(game.playtime_forever || 0)}
+              </div>
+              <div style={{ fontSize: "11px", opacity: 0.7 }}>
+                Total Playtime
+              </div>
+            </div>
+            
+            {game.playtime_2weeks ? (
+              <div style={{
+                backgroundColor: "rgba(255,255,255,0.05)",
+                padding: "12px",
+                borderRadius: "6px",
+                textAlign: "center"
+              }}>
+                <div style={{ fontSize: "20px", fontWeight: "bold", color: "#4CAF50" }}>
+                  {formatPlaytime(game.playtime_2weeks)}
+                </div>
+                <div style={{ fontSize: "11px", opacity: 0.7 }}>
+                  Last 2 Weeks
+                </div>
+              </div>
+            ) : (
+              <div style={{
+                backgroundColor: "rgba(255,255,255,0.05)",
+                padding: "12px",
+                borderRadius: "6px",
+                textAlign: "center"
+              }}>
+                <div style={{ fontSize: "20px", fontWeight: "bold", color: "#FF9800" }}>
+                  {game.has_achievements ? (game.total_achievements || 0) : "N/A"}
+                </div>
+                <div style={{ fontSize: "11px", opacity: 0.7 }}>
+                  Achievements
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Achievement Progress */}
+          {game.has_achievements && game.total_achievements && game.total_achievements > 0 && (
+            <div style={{
+              padding: "12px",
+              backgroundColor: "rgba(76, 175, 80, 0.1)",
+              borderRadius: "6px",
+              border: "1px solid rgba(76, 175, 80, 0.3)",
+              textAlign: "center",
+              marginBottom: "12px"
+            }}>
+              <div style={{ fontSize: "13px", fontWeight: "500", marginBottom: "4px" }}>
+                🏆 Achievement Progress
+              </div>
+              <div style={{ fontSize: "16px", fontWeight: "bold", color: "#4CAF50", marginBottom: "2px" }}>
+                {game.unlocked_achievements || 0} / {game.total_achievements}
+              </div>
+              <div style={{ fontSize: "11px", opacity: 0.8 }}>
+                {game.achievement_percentage?.toFixed(1) || "0"}% completed
+              </div>
+            </div>
           )}
+
+          <div style={{
+            marginTop: "12px",
+            fontSize: "11px",
+            opacity: 0.6,
+            textAlign: "center"
+          }}>
+            App ID: {game.app_id}
+          </div>
+        </div>
+      </div>
+    </ConfirmModal>
+  );
+};
+
+// Enhanced Perfect Game Modal Component
+const PerfectGameModal: VFC<{ game: GameInfo; closeModal?: () => void }> = ({ game, closeModal }) => {
+  const { getBestImage } = useGameArtwork(game.app_id);
+
+  return (
+    <ConfirmModal
+      strTitle=""
+      onOK={closeModal}
+      onCancel={closeModal}
+      strOKButtonText="Close"
+      bHideCloseIcon={false}
+    >
+      <div style={modalStyles.container}>
+        {/* Hero Image Banner */}
+        <div style={modalStyles.heroImageBanner}>
+          {(() => {
+            const bestImage = getBestImage(game.header_image);
+            let imageUrl = bestImage || game.header_image;
+            
+            // Fallback to Steam CDN if no image URL
+            if (!imageUrl && game.app_id) {
+              imageUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${game.app_id}/header.jpg`;
+            }
+            
+            
+            return imageUrl ? (
+              <img 
+                src={imageUrl}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  opacity: 0.8
+                }}
+                alt={game.name}
+                onError={(e) => {
+                  // Try fallback Steam CDN URL if the original image failed
+                  const currentSrc = e.currentTarget.src;
+                  const steamCdnUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${game.app_id}/header.jpg`;
+                  
+                  if (currentSrc !== steamCdnUrl && game.app_id) {
+                    e.currentTarget.src = steamCdnUrl;
+                  } else {
+                    // If all attempts fail, hide the image
+                    e.currentTarget.style.display = "none";
+                  }
+                }}
+              />
+            ) : null;
+          })()}
           
           {/* Overlay with gradient */}
           <div style={{
@@ -109,7 +403,7 @@ const PerfectGameModal: VFC<{ game: GameInfo; closeModal?: () => void }> = ({ ga
         </div>
         
         {/* Stats Grid */}
-        <div style={{ padding: "0 15px 15px" }}>
+        <div style={{ padding: "0 16px 8px" }}>
           <div style={{
             display: "grid",
             gridTemplateColumns: "1fr 1fr",
@@ -137,7 +431,7 @@ const PerfectGameModal: VFC<{ game: GameInfo; closeModal?: () => void }> = ({ ga
               textAlign: "center"
             }}>
               <div style={{ fontSize: "20px", fontWeight: "bold", color: "#2196F3" }}>
-                {formatPlaytime(game.playtime_forever)}
+                {formatPlaytime(game.playtime_forever || 0)}
               </div>
               <div style={{ fontSize: "11px", opacity: 0.7 }}>
                 Playtime
@@ -177,8 +471,10 @@ const PerfectGameModal: VFC<{ game: GameInfo; closeModal?: () => void }> = ({ ga
 
 export const OverallTab: VFC<OverallTabProps> = ({
   overallProgress,
+  recentlyPlayedGames,
   isLoading,
-  onFetchProgress
+  onFetchProgress,
+  onFetchRecentlyPlayed
 }) => {
   const getCompletionStats = () => {
     if (!overallProgress || overallProgress.error) return null;
@@ -403,6 +699,70 @@ export const OverallTab: VFC<OverallTabProps> = ({
         </PanelSectionRow>
       </PanelSection>
       
+      {/* Recently Played Games Section */}
+      {recentlyPlayedGames && recentlyPlayedGames.length > 0 && (
+        <PanelSection title="Recently Played Games">
+          <div style={{ maxHeight: "300px", overflowY: "auto", overflowX: "hidden" }}>
+            <Focusable style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+              {recentlyPlayedGames.map((game) => (
+                <PanelSectionRow key={game.app_id}>
+                  <ButtonItem
+                    layout="below"
+                    onClick={() => {
+                      showModal(
+                        <RecentlyPlayedGameModal game={game} />
+                      );
+                    }}
+                  >
+                    <RecentlyPlayedGameListItem game={game} />
+                  </ButtonItem>
+                </PanelSectionRow>
+              ))}
+            </Focusable>
+          </div>
+          <PanelSectionRow>
+            <ButtonItem
+              layout="below"
+              onClick={onFetchRecentlyPlayed}
+              disabled={isLoading}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px" }}>
+                <FaSync 
+                  style={{ 
+                    fontSize: "12px",
+                    animation: isLoading ? "spin 1s linear infinite" : "none"
+                  }} 
+                />
+                {isLoading ? "Loading..." : "Refresh Recently Played"}
+              </div>
+            </ButtonItem>
+          </PanelSectionRow>
+        </PanelSection>
+      )}
+      
+      {/* Load Recently Played Button - when no games are loaded */}
+      {(!recentlyPlayedGames || recentlyPlayedGames.length === 0) && (
+        <PanelSection>
+          <PanelSectionRow>
+            <ButtonItem
+              layout="below"
+              onClick={onFetchRecentlyPlayed}
+              disabled={isLoading}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px" }}>
+                <FaSync 
+                  style={{ 
+                    fontSize: "12px",
+                    animation: isLoading ? "spin 1s linear infinite" : "none"
+                  }} 
+                />
+                {isLoading ? "Loading..." : "Load Recently Played Games"}
+              </div>
+            </ButtonItem>
+          </PanelSectionRow>
+        </PanelSection>
+      )}
+      
       {/* Perfect Games Section */}
       {overallProgress?.perfect_games && overallProgress.perfect_games.length > 0 && (
         <PanelSection title="Perfect Games">
@@ -418,16 +778,7 @@ export const OverallTab: VFC<OverallTabProps> = ({
                       );
                     }}
                   >
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "4px 0" }}>
-                      <FaTrophy style={{ color: "#FFD700", fontSize: "16px" }} />
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: "bold", fontSize: "14px" }}>{game.name}</div>
-                        <div style={{ fontSize: "12px", opacity: 0.7 }}>
-                          {game.achievements} achievements
-                        </div>
-                      </div>
-                      <span style={{ color: "#4CAF50", fontWeight: "bold", fontSize: "13px" }}>100%</span>
-                    </div>
+                    <PerfectGameListItem game={game} />
                   </ButtonItem>
                 </PanelSectionRow>
               ))}

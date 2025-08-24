@@ -5,18 +5,21 @@ import {
   getAchievements, 
   getRecentAchievements, 
   getAchievementProgress,
+  getRecentlyPlayedGames,
   refreshCache 
 } from "../services/api";
 import { 
   AchievementData, 
   RecentAchievement, 
-  OverallProgress 
+  OverallProgress,
+  GameInfo 
 } from "../models";
 
 export interface UseAchievementsReturn {
   // State
   achievements: AchievementData | null;
   recentAchievements: RecentAchievement[];
+  recentlyPlayedGames: GameInfo[];
   overallProgress: OverallProgress | null;
   isLoading: boolean;
   loadingMessage: string;
@@ -24,6 +27,7 @@ export interface UseAchievementsReturn {
   // Actions
   fetchAchievements: (appId?: number) => Promise<void>;
   fetchRecentAchievements: () => Promise<void>;
+  fetchRecentlyPlayedGames: () => Promise<void>;
   fetchOverallProgress: () => Promise<void>;
   handleRefresh: (appId?: number) => Promise<void>;
   clearAchievements: () => void;
@@ -32,6 +36,7 @@ export interface UseAchievementsReturn {
 export const useAchievements = (): UseAchievementsReturn => {
   const [achievements, setAchievements] = useState<AchievementData | null>(null);
   const [recentAchievements, setRecentAchievements] = useState<RecentAchievement[]>([]);
+  const [recentlyPlayedGames, setRecentlyPlayedGames] = useState<GameInfo[]>([]);
   const [overallProgress, setOverallProgress] = useState<OverallProgress | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("");
@@ -78,6 +83,27 @@ export const useAchievements = (): UseAchievementsReturn => {
       toaster.toast({
         title: "Error",
         body: "Failed to fetch recent achievements",
+        critical: true
+      });
+    } finally {
+      setIsLoading(false);
+      setLoadingMessage("");
+    }
+  }, []);
+
+  const fetchRecentlyPlayedGames = useCallback(async () => {
+    setIsLoading(true);
+    setLoadingMessage("Loading recently played games...");
+    try {
+      const result = await getRecentlyPlayedGames(5);
+      if (result) {
+        setRecentlyPlayedGames(result);
+      }
+    } catch (error) {
+      console.error("Failed to fetch recently played games:", error);
+      toaster.toast({
+        title: "Error",
+        body: "Failed to fetch recently played games",
         critical: true
       });
     } finally {
@@ -136,6 +162,7 @@ export const useAchievements = (): UseAchievementsReturn => {
   const clearAchievements = useCallback(() => {
     setAchievements(null);
     setRecentAchievements([]);
+    setRecentlyPlayedGames([]);
     setOverallProgress(null);
   }, []);
 
@@ -143,6 +170,7 @@ export const useAchievements = (): UseAchievementsReturn => {
     // State
     achievements,
     recentAchievements,
+    recentlyPlayedGames,
     overallProgress,
     isLoading,
     loadingMessage,
@@ -150,6 +178,7 @@ export const useAchievements = (): UseAchievementsReturn => {
     // Actions
     fetchAchievements,
     fetchRecentAchievements,
+    fetchRecentlyPlayedGames,
     fetchOverallProgress,
     handleRefresh,
     clearAchievements

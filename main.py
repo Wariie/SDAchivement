@@ -92,7 +92,13 @@ class Plugin:
         """Cleanup when plugin is unloaded"""
         decky.logger.info("Steam Achievement Tracker unloading")
         if self.api:
-            await self.api.close()
+            try:
+                await self.api.close()
+            except Exception as e:
+                decky.logger.warning(f"Error during API cleanup: {e}")
+            finally:
+                self.api = None
+                self.achievement_service = None
     
     async def _migration(self):
         """Handle plugin migrations"""
@@ -113,28 +119,34 @@ class Plugin:
     
     # ==================== Settings Management ====================
 
+    def _get_settings_dict(self) -> Dict:
+        """Helper method to build settings dictionary"""
+        refresh_interval = self.settings_service.settings.get('refresh_interval', 30) if self.settings_service.settings else 30
+        auto_refresh = self.settings_service.settings.get('auto_refresh', True) if self.settings_service.settings else True
+        
+        return {
+            "steam_api_key": self.settings_service.api_key or "",
+            "steam_user_id": self.settings_service.user_id or "",
+            "test_app_id": self.settings_service.test_app_id,
+            "api_key_set": bool(self.settings_service.api_key),
+            "user_id_set": bool(self.settings_service.user_id),
+            "auto_refresh": auto_refresh,
+            "refresh_interval": refresh_interval,
+            "tracked_game": self.settings_service.get_tracked_game()
+        }
+    
+    def _update_plugin_state(self):
+        """Update plugin state from settings service"""
+        self.steam_api_key = self.settings_service.api_key
+        self.current_user_id = self.settings_service.user_id
+        self.test_app_id = self.settings_service.test_app_id
+
     async def load_settings(self) -> Dict:
         """Load and return settings for UI (callable from frontend)"""
         try:
-            # Force reload from disk to ensure fresh data
             await self.settings_service.load()
-            
-            # Update plugin state
-            self.steam_api_key = self.settings_service.api_key
-            self.current_user_id = self.settings_service.user_id
-            self.test_app_id = self.settings_service.test_app_id
-
-            refresh_interval = self.settings_service.settings.get('refresh_interval', 30) if self.settings_service.settings else 30
-            
-            # Return settings for UI
-            return {
-                "steam_api_key": self.steam_api_key or "",
-                "steam_user_id": self.current_user_id or "",
-                "test_app_id": self.test_app_id,
-                "auto_refresh": self.settings_service.settings.get('auto_refresh', True) if self.settings_service.settings else True,# You can add these to settings service if needed
-                "refresh_interval": refresh_interval,
-                "tracked_game": self.settings_service.get_tracked_game()
-            }
+            self._update_plugin_state()
+            return self._get_settings_dict()
         except Exception as e:
             decky.logger.error(f"Failed to load settings: {e}")
             return {}
@@ -142,19 +154,7 @@ class Plugin:
     async def get_settings(self) -> Dict:
         """Get current settings without reloading from disk"""
         try:
-            refresh_interval = self.settings_service.settings.get('refresh_interval', 30) if self.settings_service.settings else 30
-            auto_refresh = self.settings_service.settings.get('auto_refresh', True) if self.settings_service.settings else True
-
-            return {
-                "steam_api_key": self.settings_service.api_key or "",
-                "steam_user_id": self.settings_service.user_id or "",
-                "test_app_id": self.settings_service.test_app_id,
-                "api_key_set": bool(self.settings_service.api_key),
-                "user_id_set": bool(self.settings_service.user_id),
-                "auto_refresh": auto_refresh,
-                "refresh_interval": refresh_interval,
-                "tracked_game": self.settings_service.get_tracked_game()
-            }
+            return self._get_settings_dict()
         except Exception as e:
             decky.logger.error(f"Failed to get settings: {e}")
             return {}
@@ -164,34 +164,15 @@ class Plugin:
         try:
             decky.logger.info("Force reloading settings from disk")
             
-            # Reload from disk
             await self.settings_service.load()
-            
-            # Update Plugin's state
-            self.steam_api_key = self.settings_service.api_key
-            self.current_user_id = self.settings_service.user_id
-            self.test_app_id = self.settings_service.test_app_id
+            self._update_plugin_state()
             
             # Reinitialize API if needed
             if self.steam_api_key and self.current_user_id:
                 await self._reinitialize_api()
             
             decky.logger.info(f"Settings reloaded - API Key: {bool(self.steam_api_key)}, User ID: {self.current_user_id}")
-            
-            # Return the current settings for UI
-            refresh_interval = self.settings_service.settings.get('refresh_interval', 30) if self.settings_service.settings else 30
-            auto_refresh = self.settings_service.settings.get('auto_refresh', True) if self.settings_service.settings else True
-            
-            return {
-                "steam_api_key": self.settings_service.api_key or "",
-                "steam_user_id": self.settings_service.user_id or "",
-                "test_app_id": self.settings_service.test_app_id,
-                "api_key_set": bool(self.settings_service.api_key),
-                "user_id_set": bool(self.settings_service.user_id),
-                "auto_refresh": auto_refresh,
-                "refresh_interval": refresh_interval,
-                "tracked_game": self.settings_service.get_tracked_game()
-            }
+            return self._get_settings_dict()
                 
         except Exception as e:
             decky.logger.error(f"Failed to reload settings: {e}")
@@ -378,6 +359,74 @@ class Plugin:
             return []
         return await self.achievement_service.get_recent_achievements(limit)
     
+    async def get_recently_played_games(self, count: int = 5) -> List[Dict]:
+        """Get recently played games with enhanced info"""
+        if not self.achievement_service:
+            return []
+        
+        try:
+            if not self.api:
+                return []
+                
+            response = await self.api.get_recently_played_games()
+            if not response or "response" not in response or "games" not in response["response"]:
+                return []
+                
+            games = response["response"]["games"][:count]
+            enhanced_games = []
+            
+            for game in games:
+                enhanced_game = {
+                    "app_id": game["appid"],
+                    "name": game["name"],
+                    "playtime_forever": game.get("playtime_forever", 0),
+                    "playtime_2weeks": game.get("playtime_2weeks", 0),
+                    "img_icon_url": game.get("img_icon_url", ""),
+                    "img_logo_url": game.get("img_logo_url", ""),
+                    "header_image": ""
+                }
+                
+                # Get header image from app details
+                try:
+                    app_details = await self.api.get_app_details(game["appid"])
+                    if app_details:
+                        enhanced_game["header_image"] = app_details.get("header_image", "")
+                        enhanced_game["has_achievements"] = app_details.get("has_achievements", False)
+                        enhanced_game["achievement_count"] = app_details.get("achievement_count", 0)
+                except:
+                    pass
+                
+                # Try to get achievement progress
+                try:
+                    achievements = await self.achievement_service.get_achievements(game["appid"])
+                    if achievements and not achievements.get("error"):
+                        enhanced_game.update({
+                            "has_achievements": True,
+                            "total_achievements": achievements.get("total", 0),
+                            "unlocked_achievements": achievements.get("unlocked", 0),
+                            "achievement_percentage": achievements.get("percentage", 0.0)
+                        })
+                    else:
+                        enhanced_game.update({
+                            "total_achievements": enhanced_game.get("achievement_count", 0),
+                            "unlocked_achievements": 0,
+                            "achievement_percentage": 0.0
+                        })
+                except:
+                    enhanced_game.update({
+                        "total_achievements": enhanced_game.get("achievement_count", 0),
+                        "unlocked_achievements": 0,
+                        "achievement_percentage": 0.0
+                    })
+                
+                enhanced_games.append(enhanced_game)
+            
+            return enhanced_games
+            
+        except Exception as e:
+            decky.logger.error(f"Failed to get recently played games: {e}")
+            return []
+    
     async def get_achievement_progress(self, force_refresh: bool = False) -> Dict:
         """Get overall achievement progress"""
         if not self.achievement_service:
@@ -415,8 +464,15 @@ class Plugin:
     async def _reinitialize_api(self):
         """Reinitialize API after settings change"""
         try:
+            # Properly close existing API session
             if self.api:
-                await self.api.close()
+                try:
+                    await self.api.close()
+                except Exception as e:
+                    decky.logger.warning(f"Error closing existing API session: {e}")
+                finally:
+                    self.api = None
+                    self.achievement_service = None
             
             if self.steam_api_key and self.current_user_id:
                 self.api = SteamAPI(self.steam_api_key, self.current_user_id, self.cache_dir)
@@ -429,3 +485,6 @@ class Plugin:
                 decky.logger.info("API and services reinitialized")
         except Exception as e:
             decky.logger.error(f"Failed to reinitialize API: {e}")
+            # Ensure cleanup even on error
+            self.api = None
+            self.achievement_service = None

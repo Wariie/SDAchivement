@@ -53,9 +53,10 @@ class SteamAPI:
             return None
 
     async def close(self):
-        if self.session:
+        """Properly close the session and clean up resources"""
+        if self.session and not self.session.closed:
             await self.session.close()
-            self.session = None
+        self.session = None
 
     # ---------------------------
     # User & Games
