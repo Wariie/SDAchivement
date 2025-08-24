@@ -11,7 +11,7 @@ import { TabNavigation } from "./components/common/TabNavigation";
 import { CurrentGameTab } from "./components/tabs/CurrentGameTab";
 import { RecentTab } from "./components/tabs/RecentTab";
 import { OverallTab } from "./components/tabs/OverallTab";
-import { SettingsTab } from "./components/tabs/SettingsTab";
+import { SettingsTabModal } from "./components/tabs/SettingsTab";
 
 // Import hooks
 import { useSettings } from "./hooks/useSettings";
@@ -98,15 +98,8 @@ const Content: VFC = () => {
         // Load settings first
         await settings.loadPluginSettings();
         
-        // Log tracked game for debugging
-        console.log("===== TRACKED GAME DEBUG =====");
-        console.log("settings.trackedGame:", settings.trackedGame);
-        console.log("settings.settingsLoaded:", settings.settingsLoaded);
-        console.log("==============================");
-        
         // Load tracked game from settings after settings are loaded
         if (settings.trackedGame) {
-          console.log("Setting tracked game:", settings.trackedGame);
           setTrackedGame(settings.trackedGame);
           
           // Also load achievements for tracked game
@@ -114,7 +107,6 @@ const Content: VFC = () => {
             const result = await getAchievements(settings.trackedGame.app_id);
             if (result && !result.error) {
               setTrackedGameAchievements(result);
-              console.log("Loaded tracked game achievements");
             }
           } catch (error) {
             console.error("Failed to load tracked game achievements:", error);
@@ -129,13 +121,10 @@ const Content: VFC = () => {
 
         // Load installed games by scanning Steam installation
         try {
-          console.log("Scanning for installed Steam games...");
           const installedGamesList = await getInstalledGames();
-          console.log("getInstalledGames result:", installedGamesList);
           
           if (installedGamesList && Array.isArray(installedGamesList)) {
             setInstalledGames(installedGamesList);
-            console.log(`Found ${installedGamesList.length} installed games`);
           } else {
             console.error("Failed to get installed games:", installedGamesList);
             // Fallback to perfect games if scanning fails
@@ -175,7 +164,6 @@ const Content: VFC = () => {
   useEffect(() => {
     // Only sync if settings are loaded and we're not actively clearing
     if (!settings.settingsLoaded || isClearingTrackedGame) {
-      console.log("Settings not loaded yet or clearing in progress, skipping sync");
       return;
     }    
     if (settings.trackedGame && (!trackedGame || settings.trackedGame.app_id !== trackedGame.app_id)) {
@@ -354,8 +342,10 @@ const Content: VFC = () => {
         return (
           <OverallTab
             overallProgress={achievements.overallProgress}
+            recentlyPlayedGames={achievements.recentlyPlayedGames}
             isLoading={achievements.isLoading}
             onFetchProgress={achievements.fetchOverallProgress}
+            onFetchRecentlyPlayed={achievements.fetchRecentlyPlayedGames}
             onGameClick={(gameId) => {
               // Could navigate to game details or set as tracked game
               console.log("Game clicked:", gameId);
@@ -365,7 +355,7 @@ const Content: VFC = () => {
       
       case Tab.SETTINGS:
         return (
-          <SettingsTab
+          <SettingsTabModal
             settings={settings}
             installedGames={installedGames}
             trackedGame={trackedGame}

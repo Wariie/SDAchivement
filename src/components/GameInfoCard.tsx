@@ -1,7 +1,8 @@
 import React from "react";
 import { PanelSectionRow, ButtonItem } from "@decky/ui";
-import { FaGamepad, FaLock, FaTrophy, FaClock, FaStar } from "react-icons/fa";
+import { FaGamepad, FaLock, FaTrophy, FaClock, FaStar } from "../utils/icons";
 import { GameInfo } from "../models";
+import { formatPlaytime } from "../services/formatters";
 
 // Achievement type for rarest achievement
 interface Achievement {
@@ -21,15 +22,6 @@ interface GameInfoCardProps {
   game: GameInfo;
   rarestAchievement?: Achievement | null;
   onDetailsClick?: (game: GameInfo) => void;
-}
-
-function formatPlaytime(minutes?: number) {
-  if (!minutes || minutes <= 0) return "No playtime";
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  return hours > 0
-    ? `${hours}h${mins > 0 ? ` ${mins}m` : ""}`
-    : `${mins} min`;
 }
 
 export const GameInfoCard: React.VFC<GameInfoCardProps> = ({

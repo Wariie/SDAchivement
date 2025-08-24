@@ -1,7 +1,7 @@
 // components/tabs/CurrentGameTab.tsx
 import { VFC, useState, useCallback, useEffect } from "react";
 import { PanelSection, PanelSectionRow, ButtonItem, ToggleField, showModal } from "@decky/ui";
-import { FaSync, FaChevronDown, FaChevronUp } from "react-icons/fa";
+import { FaSync, FaChevronDown, FaChevronUp } from "../../utils/icons";
 import { GameInfo, AchievementData, SortBy, TrackedGame } from "../../models";
 import { GameBanner } from "../game/GameBanner";
 import { ProgressDisplay } from "../common/ProgressDisplay";
@@ -41,6 +41,7 @@ export const CurrentGameTab: VFC<CurrentGameTabProps> = ({
 }) => {
   const [showHidden, setShowHidden] = useState(false);
   const [sortBy, setSortBy] = useState<SortBy>("unlock");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [filterRarity, setFilterRarity] = useState(0);
   const [showUnlockedOnly, setShowUnlockedOnly] = useState(false);
   const [showLockedOnly, setShowLockedOnly] = useState(false);
@@ -48,8 +49,14 @@ export const CurrentGameTab: VFC<CurrentGameTabProps> = ({
   const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [enhancedTrackedGame, setEnhancedTrackedGame] = useState<GameInfo | null>(null);
 
+  // Determine which game and achievements to display
+  const displayGame = viewMode === "current" ? currentGame : 
+    (enhancedTrackedGame || (trackedGame ? { ...trackedGame, is_running: false, has_achievements: true } as GameInfo : null));
+  const displayAchievements = viewMode === "current" ? achievements : trackedGameAchievements;
+
   const handleRefresh = async () => {
-    if (viewMode === "current") {
+    if (viewMode === "current" || !displayGame) {
+      // Always try to refresh current game if we're in current mode or have no display game
       await onRefreshGame();
       if (currentGame) {
         await onRefreshAchievements();
@@ -93,12 +100,19 @@ export const CurrentGameTab: VFC<CurrentGameTabProps> = ({
     }
   }, [currentGame, trackedGame]); // Removed viewMode from dependencies to prevent loops
 
+  // Auto-switch back to current mode when tracked game is cleared
+  useEffect(() => {
+    // If we're in tracked mode but there's no tracked game, switch back to current mode
+    if (viewMode === "tracked" && !trackedGame) {
+      setViewMode("current");
+    }
+  }, [trackedGame, viewMode]);
+
   // Fetch enhanced tracked game info (with header_image)
   useEffect(() => {
     const fetchTrackedGameInfo = async () => {
       if (trackedGame && trackedGame.app_id) {
         try {
-          console.log("Fetching enhanced info for tracked game:", trackedGame.app_id);
           const gameInfo = await getGameInfo(trackedGame.app_id);
           if (gameInfo) {
             // Create enhanced game object with header_image
@@ -109,13 +123,13 @@ export const CurrentGameTab: VFC<CurrentGameTabProps> = ({
               is_running: false // Tracked games aren't necessarily running
             };
             setEnhancedTrackedGame(enhanced);
-            console.log("Enhanced tracked game info loaded:", enhanced);
           }
         } catch (error) {
           console.error("Failed to fetch tracked game info:", error);
           setEnhancedTrackedGame(null);
         }
       } else {
+        // Clear enhanced tracked game when there's no tracked game
         setEnhancedTrackedGame(null);
       }
     };
@@ -123,12 +137,17 @@ export const CurrentGameTab: VFC<CurrentGameTabProps> = ({
     fetchTrackedGameInfo();
   }, [trackedGame]);
 
-  const getSortDisplayName = (sort: SortBy): string => {
+  const getSortDisplayName = (sort: SortBy, order: "asc" | "desc"): string => {
+    const orderText = order === "asc" ? " (Ascending)" : " (Descending)";
     switch (sort) {
-      case "unlock": return "Recently Unlocked";
-      case "name": return "Name";
-      case "rarity": return "Rarity";
-      default: return "Recently Unlocked";
+      case "unlock": 
+        return order === "desc" ? "Recently Unlocked" : "Oldest Unlocked";
+      case "name": 
+        return "Name" + orderText;
+      case "rarity": 
+        return "Rarity" + orderText;
+      default: 
+        return "Recently Unlocked";
     }
   };
 
@@ -143,11 +162,28 @@ export const CurrentGameTab: VFC<CurrentGameTabProps> = ({
     }
   };
 
-  const cycleSortBy = () => {
-    const sorts: SortBy[] = ["unlock", "name", "rarity"];
-    const currentIndex = sorts.indexOf(sortBy);
-    const nextIndex = (currentIndex + 1) % sorts.length;
-    setSortBy(sorts[nextIndex]);
+  const cycleSortOption = () => {
+    // Define all sort combinations in the desired order
+    const sortOptions: Array<{sort: SortBy, order: "asc" | "desc"}> = [
+      { sort: "unlock", order: "desc" }, // Recently Unlocked
+      { sort: "unlock", order: "asc" },  // Oldest Unlocked
+      { sort: "name", order: "asc" },    // Name (Ascending)
+      { sort: "name", order: "desc" },   // Name (Descending)
+      { sort: "rarity", order: "asc" },  // Rarity (Ascending)
+      { sort: "rarity", order: "desc" }  // Rarity (Descending)
+    ];
+    
+    // Find current combination
+    const currentIndex = sortOptions.findIndex(
+      option => option.sort === sortBy && option.order === sortOrder
+    );
+    
+    // Move to next option (or back to first if at end)
+    const nextIndex = (currentIndex + 1) % sortOptions.length;
+    const nextOption = sortOptions[nextIndex];
+    
+    setSortBy(nextOption.sort);
+    setSortOrder(nextOption.order);
   };
 
   const cycleFilterRarity = () => {
@@ -156,11 +192,6 @@ export const CurrentGameTab: VFC<CurrentGameTabProps> = ({
     const nextIndex = (currentIndex + 1) % rarities.length;
     setFilterRarity(rarities[nextIndex]);
   };
-
-  // Determine which game and achievements to display
-  const displayGame = viewMode === "current" ? currentGame : 
-    (enhancedTrackedGame || (trackedGame ? { ...trackedGame, is_running: false, has_achievements: true } as GameInfo : null));
-  const displayAchievements = viewMode === "current" ? achievements : trackedGameAchievements;
 
   return (
     <div style={{ padding: "0", margin: "0" }}>
@@ -220,10 +251,10 @@ export const CurrentGameTab: VFC<CurrentGameTabProps> = ({
               <PanelSectionRow>
                 <ButtonItem
                   layout="below"
-                  onClick={cycleSortBy}
+                  onClick={cycleSortOption}
                 >
                   <div style={{ fontSize: "14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <span>Sort: {getSortDisplayName(sortBy)}</span>
+                    <span>Sort: {getSortDisplayName(sortBy, sortOrder)}</span>
                     <span style={{ fontSize: "12px", opacity: 0.6 }}>→</span>
                   </div>
                 </ButtonItem>
@@ -300,6 +331,7 @@ export const CurrentGameTab: VFC<CurrentGameTabProps> = ({
             <AchievementList
               achievements={displayAchievements.achievements}
               sortBy={sortBy}
+              sortOrder={sortOrder}
               showHidden={showHidden}
               filterRarity={filterRarity}
               showUnlockedOnly={showUnlockedOnly}

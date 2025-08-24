@@ -5,7 +5,6 @@ import {
   PanelSectionRow, 
   ButtonItem, 
   Focusable,
-  Navigation,
   showModal
 } from "@decky/ui";
 import { FaSync, FaStar } from "react-icons/fa";
@@ -25,9 +24,9 @@ export const RecentTab: VFC<RecentTabProps> = ({
   isLoading,
   onFetchRecent
 }) => {
-  const handleNavigateToGame = (gameId: number) => {
-    Navigation.NavigateToSteamWeb(`https://store.steampowered.com/app/${gameId}`);
-  };
+  // const handleNavigateToGame = (gameId: number) => {
+  //   Navigation.NavigateToSteamWeb(`https://store.steampowered.com/app/${gameId}`);
+  // };
 
   const convertRecentToAchievement = (recent: RecentAchievement): Achievement => {
     return {

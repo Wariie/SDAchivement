@@ -3,6 +3,7 @@ Achievement service for fetching and processing achievement data
 """
 import time
 import json
+import asyncio
 import decky
 from typing import Dict, List, Optional
 from models.validators import validate_achievement_data, validate_progress_data
@@ -117,10 +118,10 @@ class AchievementService:
                         "is_running": False
                     })
             
-            # Sort by playtime (most played first) for better UX
-            games_with_achievements.sort(key=lambda x: x["playtime_forever"], reverse=True)
-            
             decky.logger.info(f"Found {len(games_with_achievements)} games with community stats")
+            
+            # Sort by playtime for better UX (most played first)
+            games_with_achievements.sort(key=lambda x: x.get("playtime_forever", 0), reverse=True)
             return games_with_achievements
             
         except Exception as e:
@@ -163,39 +164,72 @@ class AchievementService:
             games_with_achievements = 0
             processed_games = 0
             
-            # Progress tracking
-            progress_interval = max(1, len(games) // 20)
+            # Process games concurrently in controlled batches
+            batch_size = 8  # Process 8 games at a time
+            semaphore = asyncio.Semaphore(4)  # Limit concurrent API requests to 4
             
-            for i, game in enumerate(games):
-                if i % progress_interval == 0 and i > 0:
-                    decky.logger.info(f"Progress: {i}/{len(games)} games ({(i/len(games)*100):.1f}%)")
-                
-                decky.logger.debug(f"Processing game {i+1}/{len(games)}: {game.get('name', 'Unknown')}")
-                
-                # Skip games without community visible stats
-                if not game.get("has_community_visible_stats"):
-                    continue
-                    
-                try:
-                    achievements = await self.get_achievements(game["appid"])
-                    if achievements and isinstance(achievements, dict) and not achievements.get("error"):
-                        if "total" in achievements and achievements["total"] > 0:
-                            games_with_achievements += 1
-                            total_achievements += achievements["total"]
-                            unlocked_achievements += achievements["unlocked"]
-                            processed_games += 1
-                            
-                            # Check for perfect completion
-                            if achievements["unlocked"] == achievements["total"]:
-                                perfect_games.append({
-                                    "name": game.get("name", f"App {game['appid']}"),
-                                    "app_id": game["appid"],
-                                    "achievements": achievements["total"]
-                                })
+            async def process_game(game):
+                """Process a single game with semaphore control"""
+                async with semaphore:
+                    # Skip games without community visible stats
+                    if not game.get("has_community_visible_stats"):
+                        return None
+                        
+                    try:
+                        achievements = await self.get_achievements(game["appid"])
+                        if achievements and isinstance(achievements, dict) and not achievements.get("error"):
+                            if "total" in achievements and achievements["total"] > 0:
+                                result = {
+                                    "achievements": achievements,
+                                    "game": game,
+                                    "is_perfect": achievements["unlocked"] == achievements["total"]
+                                }
                                 
-                except Exception as e:
-                    decky.logger.warning(f"Failed to get achievements for {game.get('name', game['appid'])}: {e}")
-                    continue
+                                # Get header image for perfect games only
+                                if result["is_perfect"]:
+                                    try:
+                                        app_details = await self.api.get_app_details(game["appid"])
+                                        result["header_image"] = app_details.get("header_image", "") if app_details else ""
+                                    except Exception:
+                                        result["header_image"] = ""
+                                
+                                return result
+                                
+                    except Exception as e:
+                        decky.logger.warning(f"Failed to get achievements for {game.get('name', game['appid'])}: {e}")
+                    return None
+            
+            # Process games in batches to avoid overwhelming the API
+            total_batches = (len(games) + batch_size - 1) // batch_size
+            for i in range(0, len(games), batch_size):
+                batch = games[i:i + batch_size]
+                batch_num = i // batch_size + 1
+                decky.logger.info(f"Processing batch {batch_num}/{total_batches}: {len(batch)} games")
+                
+                # Process batch concurrently
+                tasks = [process_game(game) for game in batch]
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+                
+                # Process results from this batch
+                for result in results:
+                    if result and not isinstance(result, Exception):
+                        games_with_achievements += 1
+                        total_achievements += result["achievements"]["total"]
+                        unlocked_achievements += result["achievements"]["unlocked"]
+                        processed_games += 1
+                        
+                        if result["is_perfect"]:
+                            perfect_games.append({
+                                "name": result["game"].get("name", f"App {result['game']['appid']}"),
+                                "app_id": result["game"]["appid"],
+                                "achievements": result["achievements"]["total"],
+                                "playtime_forever": result["game"].get("playtime_forever", 0),
+                                "header_image": result.get("header_image", "")
+                            })
+                
+                # Small delay between batches to be respectful to Steam's API
+                if i + batch_size < len(games):
+                    await asyncio.sleep(0.5)
             
             average_completion = round((unlocked_achievements / total_achievements * 100) if total_achievements > 0 else 0, 1)
             

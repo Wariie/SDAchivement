@@ -37,6 +37,15 @@ export function formatTime(timestamp: number): string {
   return date.toLocaleDateString() + " " + date.toLocaleTimeString();
 }
 
+export function formatPlaytime(minutes?: number): string {
+  if (!minutes || minutes === 0) return "0 minutes";
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  if (hours === 0) return `${minutes} minutes`;
+  if (remainingMinutes === 0) return `${hours} hours`;
+  return `${hours}h ${remainingMinutes}m`;
+}
+
 export function getRarestAchievement(achievements?: Achievement[]): Achievement | null {
   if (!achievements || achievements.length === 0) return null;
   return achievements.reduce((prev, curr) => {

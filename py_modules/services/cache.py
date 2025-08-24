@@ -3,6 +3,7 @@ Cache management service
 """
 import json
 import time
+import asyncio
 import decky
 from pathlib import Path
 from typing import Dict, Optional
@@ -25,8 +26,15 @@ class CacheService:
                 
                 # Use cache if less than 24 hours old
                 if cache_age < 86400:  # 24 hours
-                    with open(cache_file, 'r') as f:
-                        cached_data = json.load(f)
+                    # Use thread executor for non-blocking file read
+                    loop = asyncio.get_event_loop()
+                    
+                    def read_file():
+                        with open(cache_file, 'r') as f:
+                            return f.read()
+                    
+                    content = await loop.run_in_executor(None, read_file)
+                    cached_data = json.loads(content)
                     
                     decky.logger.info(f"Found cached progress (age: {cache_age/3600:.1f} hours)")
                     return cached_data
@@ -42,8 +50,15 @@ class CacheService:
         try:
             cache_file = self.cache_dir / "overall_progress.json"
             
-            with open(cache_file, 'w') as f:
-                json.dump(data, f, indent=2)
+            # Use thread executor for non-blocking file write
+            loop = asyncio.get_event_loop()
+            content = json.dumps(data, indent=2)
+            
+            def write_file():
+                with open(cache_file, 'w') as f:
+                    f.write(content)
+            
+            await loop.run_in_executor(None, write_file)
             
             decky.logger.info("Overall progress cached successfully")
             return True
@@ -102,8 +117,15 @@ class CacheService:
                 cache_age = time.time() - cache_file.stat().st_mtime
                 
                 if cache_age < max_age:
-                    with open(cache_file, 'r') as f:
-                        return json.load(f)
+                    # Use thread executor for non-blocking file read
+                    loop = asyncio.get_event_loop()
+                    
+                    def read_file():
+                        with open(cache_file, 'r') as f:
+                            return f.read()
+                    
+                    content = await loop.run_in_executor(None, read_file)
+                    return json.loads(content)
             
             return None
             
@@ -116,8 +138,15 @@ class CacheService:
         try:
             cache_file = self.cache_dir / filename
             
-            with open(cache_file, 'w') as f:
-                json.dump(data, f, indent=2)
+            # Use thread executor for non-blocking file write
+            loop = asyncio.get_event_loop()
+            content = json.dumps(data, indent=2)
+            
+            def write_file():
+                with open(cache_file, 'w') as f:
+                    f.write(content)
+            
+            await loop.run_in_executor(None, write_file)
             
             return True
             

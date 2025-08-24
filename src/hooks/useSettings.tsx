@@ -8,7 +8,8 @@ import {
   clearTestGame,
   reloadSettings,
   saveRefreshIntervalBackend,
-  saveAutoRefreshBackend
+  saveAutoRefreshBackend,
+  refreshCache
 } from "../services/api";
 import { TrackedGame } from "../models";
 
@@ -29,7 +30,7 @@ export interface UseSettingsReturn {
   
   // Actions
   loadPluginSettings: () => Promise<void>;
-  saveApiKey: () => Promise<boolean>;
+  saveApiKey: (apiKey?: string) => Promise<boolean>;
   handleSetTestGame: () => Promise<boolean>;
   handleClearTestGame: () => Promise<boolean>;
   saveAutoRefresh: (enabled: boolean) => Promise<void>;
@@ -73,18 +74,32 @@ export const useSettings = (): UseSettingsReturn => {
     }
   }, []);
 
-  const saveApiKey = useCallback(async () => {
+  const saveApiKey = useCallback(async (apiKey?: string) => {
     try {
-      const success = await setSteamApiKey(steamApiKey);
+      const keyToSave = apiKey || steamApiKey;
+      
+      const success = await setSteamApiKey(keyToSave);
       if (success) {
+        // Update local state
+        setSteamApiKeyState(keyToSave);
         setApiKeySet(true);
+        
+        // Clear cache since API key changed - fresh start with new key
+        try {
+          await refreshCache();
+          console.log("Cache cleared after API key change");
+        } catch (cacheError) {
+          console.warn("Failed to clear cache after API key change:", cacheError);
+          // Don't fail the whole operation if cache clear fails
+        }
+        
         const reloaded = await loadSettings();
         if (reloaded) {
           setSteamUserIdState(reloaded.steam_user_id || "");
         }
         toaster.toast({
           title: "Success",
-          body: "Steam API key saved successfully!"
+          body: "Steam API key saved and cache cleared!"
         });
         return true;
       } else {

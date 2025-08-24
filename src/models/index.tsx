@@ -49,9 +49,16 @@ export interface GameInfo {
   name: string;
   is_running: boolean;
   has_achievements: boolean;
-  achievements: number;
+  achievements?: number;
+  achievement_count?: number;
   header_image?: string;
   playtime_forever?: number; // Total playtime in minutes
+  playtime_2weeks?: number; // Recent playtime in minutes
+  img_icon_url?: string;
+  img_logo_url?: string;
+  total_achievements?: number;
+  unlocked_achievements?: number;
+  achievement_percentage?: number;
 }
 
 export interface OverallProgress {
@@ -84,6 +91,7 @@ export interface AchievementItemProps {
 export interface AchievementListProps {
   achievements: Achievement[];
   sortBy: SortBy;
+  sortOrder?: "asc" | "desc";
   showHidden: boolean;
   filterRarity: number;
   showUnlockedOnly?: boolean;
