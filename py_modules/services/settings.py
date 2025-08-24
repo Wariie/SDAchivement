@@ -81,6 +81,11 @@ class SettingsService:
         """Set Steam API key"""
         try:
             decky.logger.info("Setting Steam API key")
+            
+            # Ensure settings is initialized
+            if not hasattr(self, 'settings') or self.settings is None:
+                self.settings = {}
+            
             settings = self.settings.copy()
             settings['steam_api_key'] = api_key
             return await self.save(settings)

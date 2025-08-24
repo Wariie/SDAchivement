@@ -29,7 +29,7 @@ export interface UseSettingsReturn {
   
   // Actions
   loadPluginSettings: () => Promise<void>;
-  saveApiKey: () => Promise<boolean>;
+  saveApiKey: (apiKey?: string) => Promise<boolean>;
   handleSetTestGame: () => Promise<boolean>;
   handleClearTestGame: () => Promise<boolean>;
   saveAutoRefresh: (enabled: boolean) => Promise<void>;
@@ -73,10 +73,14 @@ export const useSettings = (): UseSettingsReturn => {
     }
   }, []);
 
-  const saveApiKey = useCallback(async () => {
+  const saveApiKey = useCallback(async (apiKey?: string) => {
     try {
-      const success = await setSteamApiKey(steamApiKey);
+      const keyToSave = apiKey || steamApiKey;
+      
+      const success = await setSteamApiKey(keyToSave);
       if (success) {
+        // Update local state
+        setSteamApiKeyState(keyToSave);
         setApiKeySet(true);
         const reloaded = await loadSettings();
         if (reloaded) {

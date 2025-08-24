@@ -11,7 +11,7 @@ import { TabNavigation } from "./components/common/TabNavigation";
 import { CurrentGameTab } from "./components/tabs/CurrentGameTab";
 import { RecentTab } from "./components/tabs/RecentTab";
 import { OverallTab } from "./components/tabs/OverallTab";
-import { SettingsTab } from "./components/tabs/SettingsTab";
+import { SettingsTabModal } from "./components/tabs/SettingsTabModal";
 
 // Import hooks
 import { useSettings } from "./hooks/useSettings";
@@ -355,7 +355,7 @@ const Content: VFC = () => {
       
       case Tab.SETTINGS:
         return (
-          <SettingsTab
+          <SettingsTabModal
             settings={settings}
             installedGames={installedGames}
             trackedGame={trackedGame}

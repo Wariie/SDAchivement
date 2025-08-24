@@ -137,12 +137,17 @@ export const CurrentGameTab: VFC<CurrentGameTabProps> = ({
     fetchTrackedGameInfo();
   }, [trackedGame]);
 
-  const getSortDisplayName = (sort: SortBy): string => {
+  const getSortDisplayName = (sort: SortBy, order: "asc" | "desc"): string => {
+    const orderText = order === "asc" ? " (Ascending)" : " (Descending)";
     switch (sort) {
-      case "unlock": return "Recently Unlocked";
-      case "name": return "Name";
-      case "rarity": return "Rarity";
-      default: return "Recently Unlocked";
+      case "unlock": 
+        return order === "desc" ? "Recently Unlocked" : "Oldest Unlocked";
+      case "name": 
+        return "Name" + orderText;
+      case "rarity": 
+        return "Rarity" + orderText;
+      default: 
+        return "Recently Unlocked";
     }
   };
 
@@ -157,15 +162,28 @@ export const CurrentGameTab: VFC<CurrentGameTabProps> = ({
     }
   };
 
-  const cycleSortBy = () => {
-    const sorts: SortBy[] = ["unlock", "name", "rarity"];
-    const currentIndex = sorts.indexOf(sortBy);
-    const nextIndex = (currentIndex + 1) % sorts.length;
-    setSortBy(sorts[nextIndex]);
-  };
-
-  const toggleSortOrder = () => {
-    setSortOrder(current => current === "asc" ? "desc" : "asc");
+  const cycleSortOption = () => {
+    // Define all sort combinations in the desired order
+    const sortOptions: Array<{sort: SortBy, order: "asc" | "desc"}> = [
+      { sort: "unlock", order: "desc" }, // Recently Unlocked
+      { sort: "unlock", order: "asc" },  // Oldest Unlocked
+      { sort: "name", order: "asc" },    // Name (Ascending)
+      { sort: "name", order: "desc" },   // Name (Descending)
+      { sort: "rarity", order: "asc" },  // Rarity (Ascending)
+      { sort: "rarity", order: "desc" }  // Rarity (Descending)
+    ];
+    
+    // Find current combination
+    const currentIndex = sortOptions.findIndex(
+      option => option.sort === sortBy && option.order === sortOrder
+    );
+    
+    // Move to next option (or back to first if at end)
+    const nextIndex = (currentIndex + 1) % sortOptions.length;
+    const nextOption = sortOptions[nextIndex];
+    
+    setSortBy(nextOption.sort);
+    setSortOrder(nextOption.order);
   };
 
   const cycleFilterRarity = () => {
@@ -233,29 +251,11 @@ export const CurrentGameTab: VFC<CurrentGameTabProps> = ({
               <PanelSectionRow>
                 <ButtonItem
                   layout="below"
-                  onClick={cycleSortBy}
+                  onClick={cycleSortOption}
                 >
                   <div style={{ fontSize: "14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <span>Sort: {getSortDisplayName(sortBy)}</span>
-                    <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                      <span 
-                        style={{ 
-                          fontSize: "12px", 
-                          opacity: 0.8,
-                          cursor: "pointer",
-                          padding: "2px 4px",
-                          borderRadius: "2px",
-                          backgroundColor: "rgba(255,255,255,0.1)"
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleSortOrder();
-                        }}
-                      >
-                        {sortOrder === "asc" ? "↑" : "↓"}
-                      </span>
-                      <span style={{ fontSize: "12px", opacity: 0.6 }}>→</span>
-                    </div>
+                    <span>Sort: {getSortDisplayName(sortBy, sortOrder)}</span>
+                    <span style={{ fontSize: "12px", opacity: 0.6 }}>→</span>
                   </div>
                 </ButtonItem>
               </PanelSectionRow>
