@@ -11,7 +11,7 @@ import { TabNavigation } from "./components/common/TabNavigation";
 import { CurrentGameTab } from "./components/tabs/CurrentGameTab";
 import { RecentTab } from "./components/tabs/RecentTab";
 import { OverallTab } from "./components/tabs/OverallTab";
-import { SettingsTabModal } from "./components/tabs/SettingsTabModal";
+import { SettingsTabModal } from "./components/tabs/SettingsTab";
 
 // Import hooks
 import { useSettings } from "./hooks/useSettings";

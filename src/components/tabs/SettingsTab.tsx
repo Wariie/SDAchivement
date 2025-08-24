@@ -266,11 +266,18 @@ export const SettingsTabModal: VFC<SettingsTabModalProps> = ({
             <div style={{ 
               display: "flex", 
               alignItems: "center", 
-              gap: "8px",
-              justifyContent: "center"
+              gap: "10px",
+              padding: "4px 0"
             }}>
-              <FaSync style={{ fontSize: "14px" }} />
-              {settings.autoRefresh ? "Disable Auto-refresh" : "Enable Auto-refresh"}
+              <FaSync style={{ fontSize: "16px" }} />
+              <div>
+                <div style={{ fontSize: "14px", fontWeight: "bold" }}>
+                  {settings.autoRefresh ? "Disable Auto-refresh" : "Enable Auto-refresh"}
+                </div>
+                <div style={{ fontSize: "12px", opacity: 0.7 }}>
+                  {settings.autoRefresh ? "Turn off automatic updates" : "Enable automatic updates"}
+                </div>
+              </div>
             </div>
           </ButtonItem>
         </PanelSectionRow>
@@ -301,13 +308,20 @@ export const SettingsTabModal: VFC<SettingsTabModalProps> = ({
               <div style={{ 
                 display: "flex", 
                 alignItems: "center", 
-                gap: "8px",
-                justifyContent: "center"
+                gap: "10px",
+                padding: "4px 0"
               }}>
-                <FaCog style={{ fontSize: "12px" }} />
-                Interval: {settings.refreshInterval < 60 ? 
-                  `${settings.refreshInterval} seconds` : 
-                  `${settings.refreshInterval / 60} minutes`}
+                <FaCog style={{ fontSize: "16px" }} />
+                <div>
+                  <div style={{ fontSize: "14px", fontWeight: "bold" }}>
+                    Refresh Interval
+                  </div>
+                  <div style={{ fontSize: "12px", opacity: 0.7 }}>
+                    {settings.refreshInterval < 60 ? 
+                      `${settings.refreshInterval} seconds` : 
+                      `${settings.refreshInterval / 60} minutes`}
+                  </div>
+                </div>
               </div>
             </ButtonItem>
           </PanelSectionRow>
@@ -357,11 +371,18 @@ export const SettingsTabModal: VFC<SettingsTabModalProps> = ({
                 <div style={{ 
                   display: "flex", 
                   alignItems: "center", 
-                  gap: "8px",
-                  justifyContent: "center"
+                  gap: "10px",
+                  padding: "4px 0"
                 }}>
-                  <FaGamepad style={{ fontSize: "14px" }} />
-                  Change Tracked Game
+                  <FaGamepad style={{ fontSize: "16px" }} />
+                  <div>
+                    <div style={{ fontSize: "14px", fontWeight: "bold" }}>
+                      Change Tracked Game
+                    </div>
+                    <div style={{ fontSize: "12px", opacity: 0.7 }}>
+                      Select a different game to track
+                    </div>
+                  </div>
                 </div>
               </ButtonItem>
             </PanelSectionRow>
@@ -380,11 +401,18 @@ export const SettingsTabModal: VFC<SettingsTabModalProps> = ({
                 <div style={{ 
                   display: "flex", 
                   alignItems: "center", 
-                  gap: "8px",
-                  justifyContent: "center"
+                  gap: "10px",
+                  padding: "4px 0"
                 }}>
-                  <FaTrash style={{ fontSize: "14px" }} />
-                  Clear Tracked Game
+                  <FaTrash style={{ fontSize: "16px" }} />
+                  <div>
+                    <div style={{ fontSize: "14px", fontWeight: "bold" }}>
+                      Clear Tracked Game
+                    </div>
+                    <div style={{ fontSize: "12px", opacity: 0.7 }}>
+                      Stop tracking current game
+                    </div>
+                  </div>
                 </div>
               </ButtonItem>
             </PanelSectionRow>
@@ -398,12 +426,18 @@ export const SettingsTabModal: VFC<SettingsTabModalProps> = ({
               <div style={{ 
                 display: "flex", 
                 alignItems: "center", 
-                gap: "8px",
-                justifyContent: "center",
+                gap: "10px",
                 padding: "4px 0"
               }}>
                 <FaGamepad style={{ fontSize: "16px" }} />
-                Select Tracked Game
+                <div>
+                  <div style={{ fontSize: "14px", fontWeight: "bold" }}>
+                    Select Tracked Game
+                  </div>
+                  <div style={{ fontSize: "12px", opacity: 0.7 }}>
+                    Choose a game to track achievements
+                  </div>
+                </div>
               </div>
             </ButtonItem>
           </PanelSectionRow>
@@ -420,11 +454,18 @@ export const SettingsTabModal: VFC<SettingsTabModalProps> = ({
             <div style={{ 
               display: "flex", 
               alignItems: "center", 
-              gap: "8px",
-              fontSize: "14px"
+              gap: "10px",
+              padding: "4px 0"
             }}>
-              <FaTrash style={{ fontSize: "12px" }} />
-              Clear Cache
+              <FaTrash style={{ fontSize: "16px" }} />
+              <div>
+                <div style={{ fontSize: "14px", fontWeight: "bold" }}>
+                  Clear Cache
+                </div>
+                <div style={{ fontSize: "12px", opacity: 0.7 }}>
+                  Remove cached achievement data
+                </div>
+              </div>
             </div>
           </ButtonItem>
         </PanelSectionRow>
@@ -437,11 +478,18 @@ export const SettingsTabModal: VFC<SettingsTabModalProps> = ({
             <div style={{ 
               display: "flex", 
               alignItems: "center", 
-              gap: "8px",
-              fontSize: "14px"
+              gap: "10px",
+              padding: "4px 0"
             }}>
-              <FaSync style={{ fontSize: "12px" }} />
-              Reload Settings
+              <FaSync style={{ fontSize: "16px" }} />
+              <div>
+                <div style={{ fontSize: "14px", fontWeight: "bold" }}>
+                  Reload Settings
+                </div>
+                <div style={{ fontSize: "12px", opacity: 0.7 }}>
+                  Refresh settings from disk
+                </div>
+              </div>
             </div>
           </ButtonItem>
         </PanelSectionRow>
