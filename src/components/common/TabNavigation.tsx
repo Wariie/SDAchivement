@@ -9,8 +9,8 @@ export const TabNavigation: VFC<TabNavigationProps> = ({ currentTab, onTabChange
     <PanelSection>
       <Focusable style={{ display: "flex", gap: "2px" }}>
         <DialogButton
-          style={{ 
-            flex: 1, 
+          style={{
+            flex: 1,
             padding: "8px",
             minWidth: "40px",
             backgroundColor: currentTab === Tab.CURRENT_GAME ? "rgba(255,255,255,0.1)" : "transparent"
@@ -19,10 +19,10 @@ export const TabNavigation: VFC<TabNavigationProps> = ({ currentTab, onTabChange
         >
           <FaGamepad size={16} />
         </DialogButton>
-        
+
         <DialogButton
-          style={{ 
-            flex: 1, 
+          style={{
+            flex: 1,
             padding: "8px",
             minWidth: "40px",
             backgroundColor: currentTab === Tab.RECENT ? "rgba(255,255,255,0.1)" : "transparent"
@@ -31,10 +31,10 @@ export const TabNavigation: VFC<TabNavigationProps> = ({ currentTab, onTabChange
         >
           <FaClock size={16} />
         </DialogButton>
-        
+
         <DialogButton
-          style={{ 
-            flex: 1, 
+          style={{
+            flex: 1,
             padding: "8px",
             minWidth: "40px",
             backgroundColor: currentTab === Tab.OVERALL ? "rgba(255,255,255,0.1)" : "transparent"
@@ -43,10 +43,10 @@ export const TabNavigation: VFC<TabNavigationProps> = ({ currentTab, onTabChange
         >
           <FaChartLine size={16} />
         </DialogButton>
-        
+
         <DialogButton
-          style={{ 
-            flex: 1, 
+          style={{
+            flex: 1,
             padding: "8px",
             minWidth: "40px",
             backgroundColor: currentTab === Tab.SETTINGS ? "rgba(255,255,255,0.1)" : "transparent"

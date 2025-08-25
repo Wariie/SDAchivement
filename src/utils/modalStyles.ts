@@ -4,7 +4,7 @@ export const modalStyles = {
     padding: "0",
     margin: "-16px -16px 0 -16px"
   },
-  
+
   heroImageBanner: {
     position: "relative" as const,
     height: "120px",
@@ -13,14 +13,14 @@ export const modalStyles = {
     overflow: "hidden" as const,
     marginBottom: "16px"
   },
-  
+
   heroImage: {
     width: "100%",
     height: "100%",
     objectFit: "cover" as const,
     opacity: 0.8
   },
-  
+
   overlay: {
     position: "absolute" as const,
     top: 0,
@@ -29,7 +29,7 @@ export const modalStyles = {
     bottom: 0,
     background: "linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.7) 100%)"
   },
-  
+
   titleSection: {
     position: "absolute" as const,
     bottom: "10px",
@@ -37,14 +37,14 @@ export const modalStyles = {
     right: "15px",
     color: "white"
   },
-  
+
   titleRow: {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: "4px"
   },
-  
+
   gameTitle: {
     margin: 0,
     fontSize: "18px",
@@ -55,30 +55,30 @@ export const modalStyles = {
     textOverflow: "ellipsis" as const,
     whiteSpace: "nowrap" as const
   },
-  
+
   statsContainer: {
     padding: "0 16px 8px"
   },
-  
+
   statsGrid: {
     display: "grid",
     gridTemplateColumns: "1fr 1fr",
     gap: "12px",
     marginBottom: "15px"
   },
-  
+
   statCard: {
     backgroundColor: "rgba(255,255,255,0.05)",
     padding: "12px",
     borderRadius: "6px",
     textAlign: "center" as const
   },
-  
+
   statValue: {
     fontSize: "20px",
     fontWeight: "bold" as const
   },
-  
+
   statLabel: {
     fontSize: "11px",
     opacity: 0.7

@@ -27,16 +27,16 @@ export const GameImage: React.VFC<GameImageProps> = ({
   // Determine the best image source to use
   const getImageSrc = (): string | null => {
     if (hasError) return null;
-    
+
     // Priority order: getBestImage result > headerImage prop > Steam CDN fallback
     const bestImage = getBestImage(headerImage);
     if (bestImage) return bestImage;
-    
+
     if (headerImage) return headerImage;
-    
+
     // Steam CDN fallback
     if (appId) return `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/header.jpg`;
-    
+
     return null;
   };
 
@@ -45,7 +45,7 @@ export const GameImage: React.VFC<GameImageProps> = ({
   const handleError = (e: React.SyntheticEvent<HTMLImageElement>) => {
     const currentImageSrc = e.currentTarget.src;
     const steamCdnUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/header.jpg`;
-    
+
     // If we haven't tried the Steam CDN fallback yet, try it
     if (currentImageSrc !== steamCdnUrl && appId) {
       setCurrentSrc(steamCdnUrl);

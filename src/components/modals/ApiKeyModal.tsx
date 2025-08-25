@@ -1,8 +1,8 @@
 // components/modals/ApiKeyModal.tsx
 import { VFC, useState, useEffect } from "react";
-import { 
-  ModalRoot, 
-  TextField, 
+import {
+  ModalRoot,
+  TextField,
   ButtonItem,
   PanelSection,
   PanelSectionRow
@@ -15,10 +15,10 @@ interface ApiKeyModalProps {
   closeModal?: () => void;
 }
 
-export const ApiKeyModal: VFC<ApiKeyModalProps> = ({ 
-  currentApiKey, 
-  onSave, 
-  closeModal 
+export const ApiKeyModal: VFC<ApiKeyModalProps> = ({
+  currentApiKey,
+  onSave,
+  closeModal
 }) => {
   const [apiKey, setApiKey] = useState(currentApiKey);
   const [isSaving, setIsSaving] = useState(false);
@@ -37,7 +37,7 @@ export const ApiKeyModal: VFC<ApiKeyModalProps> = ({
   const handleApiKeyChange = (value: string) => {
     setApiKey(value);
     setValidationMessage("");
-    
+
     if (value.trim().length > 0) {
       if (validateApiKey(value)) {
         setValidationMessage("✓ Valid API key format");
@@ -71,23 +71,23 @@ export const ApiKeyModal: VFC<ApiKeyModalProps> = ({
 
   return (
     <ModalRoot onCancel={closeModal}>
-      <div style={{ 
-        padding: "20px", 
-        minWidth: "400px", 
-        maxWidth: "500px" 
+      <div style={{
+        padding: "20px",
+        minWidth: "400px",
+        maxWidth: "500px"
       }}>
         <PanelSection title="">
-          <div style={{ 
-            textAlign: "center", 
-            marginBottom: "20px" 
+          <div style={{
+            textAlign: "center",
+            marginBottom: "20px"
           }}>
             <FaKey style={{ fontSize: "32px", color: "#4a9eff", marginBottom: "10px" }} />
             <h2 style={{ margin: "0 0 10px 0", fontSize: "18px" }}>
               Configure Steam API Key
             </h2>
-            <p style={{ 
-              margin: "0", 
-              fontSize: "14px", 
+            <p style={{
+              margin: "0",
+              fontSize: "14px",
               opacity: 0.8,
               lineHeight: "1.4"
             }}>
@@ -98,28 +98,28 @@ export const ApiKeyModal: VFC<ApiKeyModalProps> = ({
 
         <PanelSection>
           <PanelSectionRow>
-            <div style={{ 
+            <div style={{
               backgroundColor: "rgba(74, 158, 255, 0.1)",
               padding: "12px",
               borderRadius: "8px",
               marginBottom: "15px"
             }}>
-              <div style={{ 
-                display: "flex", 
-                alignItems: "center", 
+              <div style={{
+                display: "flex",
+                alignItems: "center",
                 gap: "8px",
                 marginBottom: "8px"
               }}>
                 <FaExternalLinkAlt style={{ fontSize: "12px" }} />
                 <strong style={{ fontSize: "13px" }}>Get Your API Key</strong>
               </div>
-              <p style={{ 
-                margin: "0", 
-                fontSize: "12px", 
+              <p style={{
+                margin: "0",
+                fontSize: "12px",
                 opacity: 0.9,
                 lineHeight: "1.3"
               }}>
-                Visit <strong>steamcommunity.com/dev/apikey</strong> to generate your free API key. 
+                Visit <strong>steamcommunity.com/dev/apikey</strong> to generate your free API key.
                 Choose any domain name (e.g., "localhost").
               </p>
             </div>
@@ -138,15 +138,15 @@ export const ApiKeyModal: VFC<ApiKeyModalProps> = ({
 
           {validationMessage && (
             <PanelSectionRow>
-              <div style={{ 
+              <div style={{
                 color: validationMessage.startsWith("✓") ? "#4CAF50" : "#ff6b6b",
                 fontSize: "12px",
                 display: "flex",
                 alignItems: "center",
                 gap: "6px"
               }}>
-                {validationMessage.startsWith("✓") ? 
-                  <FaCheck style={{ fontSize: "10px" }} /> : 
+                {validationMessage.startsWith("✓") ?
+                  <FaCheck style={{ fontSize: "10px" }} /> :
                   <FaTimes style={{ fontSize: "10px" }} />
                 }
                 {validationMessage}
@@ -155,9 +155,9 @@ export const ApiKeyModal: VFC<ApiKeyModalProps> = ({
           )}
         </PanelSection>
 
-        <div style={{ 
-          display: "flex", 
-          gap: "10px", 
+        <div style={{
+          display: "flex",
+          gap: "10px",
           marginTop: "20px",
           justifyContent: "flex-end"
         }}>
@@ -167,7 +167,7 @@ export const ApiKeyModal: VFC<ApiKeyModalProps> = ({
           >
             Cancel
           </ButtonItem>
-          
+
           <ButtonItem
             onClick={handleSave}
             disabled={!validateApiKey(apiKey) || isSaving}

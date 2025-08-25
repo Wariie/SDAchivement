@@ -4,10 +4,10 @@ import { ProgressBarWithInfo } from "@decky/ui";
 import { ProgressDisplayProps } from "../../models";
 import { calculateProgress, formatProgressText } from "../../services/formatters";
 
-export const ProgressDisplay: VFC<ProgressDisplayProps> = ({ 
-  unlocked, 
-  total, 
-  showPercentage = false 
+export const ProgressDisplay: VFC<ProgressDisplayProps> = ({
+  unlocked,
+  total,
+  showPercentage = false
 }) => {
   return (
     <>
@@ -16,10 +16,10 @@ export const ProgressDisplay: VFC<ProgressDisplayProps> = ({
         sOperationText={formatProgressText(unlocked, total, showPercentage)}
         nTransitionSec={0.3}
       />
-      
-      <div style={{ 
-        display: "flex", 
-        justifyContent: "space-between", 
+
+      <div style={{
+        display: "flex",
+        justifyContent: "space-between",
         fontSize: "12px",
         marginTop: "4px"
       }}>

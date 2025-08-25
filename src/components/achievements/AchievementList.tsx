@@ -6,11 +6,11 @@ import { AchievementDetailsModal } from "./AchievementDetailsModal";
 import { showModal } from "@decky/ui";
 import { LoadingSpinner } from "../common/LoadingSpinner";
 
-export const AchievementList: VFC<AchievementListProps> = ({ 
-  achievements, 
-  sortBy, 
+export const AchievementList: VFC<AchievementListProps> = ({
+  achievements,
+  sortBy,
   sortOrder = "desc",
-  showHidden, 
+  showHidden,
   filterRarity,
   showUnlockedOnly = false,
   showLockedOnly = false,
@@ -18,34 +18,34 @@ export const AchievementList: VFC<AchievementListProps> = ({
 }) => {
   const sortedAchievements = useMemo(() => {
     if (!achievements?.length) return [];
-    
+
     let filtered = [...achievements];
-    
+
     // Filter by rarity
     if (filterRarity > 0) {
-      filtered = filtered.filter(a => 
-        a.global_percent !== null && 
-        !isNaN(a.global_percent) && 
+      filtered = filtered.filter(a =>
+        a.global_percent !== null &&
+        !isNaN(a.global_percent) &&
         a.global_percent <= filterRarity
       );
     }
-    
+
     // Filter hidden if not showing
     if (!showHidden) {
       filtered = filtered.filter(a => !a.hidden || a.unlocked);
     }
-    
+
     // Filter by unlock status
     if (showUnlockedOnly) {
       filtered = filtered.filter(a => a.unlocked);
     } else if (showLockedOnly) {
       filtered = filtered.filter(a => !a.unlocked);
     }
-    
+
     // Sort
     filtered.sort((a, b) => {
       let compareResult = 0;
-      
+
       switch (sortBy) {
         case "name":
           compareResult = a.display_name.localeCompare(b.display_name);
@@ -66,11 +66,11 @@ export const AchievementList: VFC<AchievementListProps> = ({
           else compareResult = 0;
           break;
       }
-      
+
       // Apply sort order (reverse for ascending)
       return sortOrder === "asc" ? -compareResult : compareResult;
     });
-    
+
     return filtered;
   }, [achievements, sortBy, sortOrder, showHidden, filterRarity, showUnlockedOnly, showLockedOnly]);
 
@@ -92,11 +92,11 @@ export const AchievementList: VFC<AchievementListProps> = ({
     if (!hasAchievements) {
       return null; // Don't show anything if no achievements at all
     }
-    
+
     return (
-      <div style={{ 
-        textAlign: "center", 
-        opacity: 0.6, 
+      <div style={{
+        textAlign: "center",
+        opacity: 0.6,
         padding: "12px 8px",
         fontSize: "12px"
       }}>
@@ -106,16 +106,16 @@ export const AchievementList: VFC<AchievementListProps> = ({
   }
 
   return (
-    <div style={{ 
-      display: "flex", 
-      flexDirection: "column", 
-      gap: "1px", 
-      padding: 0, 
-      margin: 0 
+    <div style={{
+      display: "flex",
+      flexDirection: "column",
+      gap: "1px",
+      padding: 0,
+      margin: 0
     }}>
       {sortedAchievements.map((achievement) => (
-        <AchievementItem 
-          key={achievement.api_name} 
+        <AchievementItem
+          key={achievement.api_name}
           achievement={achievement}
           onClick={() => handleAchievementClick(achievement)}
         />

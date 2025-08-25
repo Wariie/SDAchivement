@@ -11,11 +11,11 @@ export function formatGlobalPercent(percent: any): string {
 export function calculateProgress(unlocked: any, total: any): number {
   const unlockedNum = Number(unlocked) || 0;
   const totalNum = Number(total) || 0;
-  
+
   if (totalNum === 0) {
     return 0;
   }
-  
+
   const progress = Math.round(unlockedNum / totalNum * 100);
   return progress;
 }
@@ -23,12 +23,12 @@ export function calculateProgress(unlocked: any, total: any): number {
 export function formatProgressText(unlocked: any, total: any, showPercentage = false): string {
   const unlockedNum = Number(unlocked) || 0;
   const totalNum = Number(total) || 0;
-  
+
   if (showPercentage) {
     const percentage = totalNum > 0 ? Math.round((unlockedNum / totalNum) * 100) : 0;
     return `${unlockedNum} / ${totalNum} achievements (${percentage}%)`;
   }
-  
+
   return `${unlockedNum} / ${totalNum} achievements`;
 }
 

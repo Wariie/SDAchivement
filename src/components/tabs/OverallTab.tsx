@@ -50,7 +50,7 @@ const PerfectGameListItem: VFC<{ game: GameInfo }> = memo(({ game }) => {
 // Recently Played Game List Item Component
 const RecentlyPlayedGameListItem: VFC<{ game: GameInfo }> = ({ game }) => {
   const { getBestImage } = useGameArtwork(game.app_id);
-  
+
   return (
     <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "4px 0" }}>
       {game.img_icon_url ? (
@@ -98,8 +98,8 @@ const RecentlyPlayedGameListItem: VFC<{ game: GameInfo }> = ({ game }) => {
         </div>
       </div>
       {game.playtime_2weeks && game.playtime_2weeks > 0 && (
-        <div style={{ 
-          fontSize: "11px", 
+        <div style={{
+          fontSize: "11px",
           opacity: 0.8,
           textAlign: "right"
         }}>
@@ -129,14 +129,14 @@ const RecentlyPlayedGameModal: VFC<{ game: GameInfo; closeModal?: () => void }> 
           {(() => {
             const bestImage = getBestImage(game.header_image);
             let imageUrl = bestImage || game.header_image;
-            
+
             // Fallback to Steam CDN if no image URL
             if (!imageUrl && game.app_id) {
               imageUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${game.app_id}/header.jpg`;
             }
-            
+
             return imageUrl ? (
-              <img 
+              <img
                 src={imageUrl}
                 style={{
                   width: "100%",
@@ -149,7 +149,7 @@ const RecentlyPlayedGameModal: VFC<{ game: GameInfo; closeModal?: () => void }> 
                   // Try fallback Steam CDN URL if the original image failed
                   const currentSrc = e.currentTarget.src;
                   const steamCdnUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${game.app_id}/header.jpg`;
-                  
+
                   if (currentSrc !== steamCdnUrl && game.app_id) {
                     e.currentTarget.src = steamCdnUrl;
                   } else {
@@ -159,7 +159,7 @@ const RecentlyPlayedGameModal: VFC<{ game: GameInfo; closeModal?: () => void }> 
               />
             ) : null;
           })()}
-          
+
           {/* Overlay with gradient */}
           <div style={{
             position: "absolute",
@@ -169,7 +169,7 @@ const RecentlyPlayedGameModal: VFC<{ game: GameInfo; closeModal?: () => void }> 
             bottom: 0,
             background: "linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.7) 100%)"
           }} />
-          
+
           {/* Title and Status Badge */}
           <div style={{
             position: "absolute",
@@ -210,7 +210,7 @@ const RecentlyPlayedGameModal: VFC<{ game: GameInfo; closeModal?: () => void }> 
             </div>
           </div>
         </div>
-        
+
         {/* Stats Grid */}
         <div style={{ padding: "0 16px 8px" }}>
           <div style={{
@@ -232,7 +232,7 @@ const RecentlyPlayedGameModal: VFC<{ game: GameInfo; closeModal?: () => void }> 
                 Total Playtime
               </div>
             </div>
-            
+
             {game.playtime_2weeks ? (
               <div style={{
                 backgroundColor: "rgba(255,255,255,0.05)",
@@ -318,15 +318,15 @@ const PerfectGameModal: VFC<{ game: GameInfo; closeModal?: () => void }> = ({ ga
           {(() => {
             const bestImage = getBestImage(game.header_image);
             let imageUrl = bestImage || game.header_image;
-            
+
             // Fallback to Steam CDN if no image URL
             if (!imageUrl && game.app_id) {
               imageUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${game.app_id}/header.jpg`;
             }
-            
-            
+
+
             return imageUrl ? (
-              <img 
+              <img
                 src={imageUrl}
                 style={{
                   width: "100%",
@@ -339,7 +339,7 @@ const PerfectGameModal: VFC<{ game: GameInfo; closeModal?: () => void }> = ({ ga
                   // Try fallback Steam CDN URL if the original image failed
                   const currentSrc = e.currentTarget.src;
                   const steamCdnUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${game.app_id}/header.jpg`;
-                  
+
                   if (currentSrc !== steamCdnUrl && game.app_id) {
                     e.currentTarget.src = steamCdnUrl;
                   } else {
@@ -350,7 +350,7 @@ const PerfectGameModal: VFC<{ game: GameInfo; closeModal?: () => void }> = ({ ga
               />
             ) : null;
           })()}
-          
+
           {/* Overlay with gradient */}
           <div style={{
             position: "absolute",
@@ -360,7 +360,7 @@ const PerfectGameModal: VFC<{ game: GameInfo; closeModal?: () => void }> = ({ ga
             bottom: 0,
             background: "linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.7) 100%)"
           }} />
-          
+
           {/* Title and Perfect Badge */}
           <div style={{
             position: "absolute",
@@ -401,7 +401,7 @@ const PerfectGameModal: VFC<{ game: GameInfo; closeModal?: () => void }> = ({ ga
             </div>
           </div>
         </div>
-        
+
         {/* Stats Grid */}
         <div style={{ padding: "0 16px 8px" }}>
           <div style={{
@@ -423,7 +423,7 @@ const PerfectGameModal: VFC<{ game: GameInfo; closeModal?: () => void }> = ({ ga
                 Achievements
               </div>
             </div>
-            
+
             <div style={{
               backgroundColor: "rgba(255,255,255,0.05)",
               padding: "12px",
@@ -478,37 +478,37 @@ export const OverallTab: VFC<OverallTabProps> = ({
 }) => {
   const getCompletionStats = () => {
     if (!overallProgress || overallProgress.error) return null;
-    
+
     const gamesStarted = overallProgress.games_with_achievements;
     const gamesOwned = overallProgress.total_games;
     const perfectGames = overallProgress.perfect_games_count;
     const unlocked = overallProgress.unlocked_achievements;
     const total = overallProgress.total_achievements;
-    
+
     // Main completion rate
     const unlockRate = total > 0 ? Math.round((unlocked / total) * 1000) / 10 : 0;
-    
+
     // Remaining achievements
     const remaining = total - unlocked;
-    
+
     // Average achievements per game (total/started)
     const avgAchievementsPerGame = gamesStarted > 0 ? Math.round(total / gamesStarted) : 0;
-    
+
     // Perfect game completion rate
     const perfectRate = gamesStarted > 0 ? Math.round((perfectGames / gamesStarted) * 1000) / 10 : 0;
-    
+
     // Games participation rate (started vs owned)
     const participationRate = gamesOwned > 0 ? Math.round((gamesStarted / gamesOwned) * 1000) / 10 : 0;
-    
+
     // Achievement density (unlocked per started game)
     const avgUnlockedPerGame = gamesStarted > 0 ? Math.round(unlocked / gamesStarted) : 0;
-    
+
     // Progress towards next perfect game (games in progress)
     const gamesInProgress = gamesStarted - perfectGames;
-    
+
     // Estimated completion if average continues
     const projectedTotal = gamesStarted > 0 ? Math.round((unlocked / gamesStarted) * gamesOwned) : 0;
-    
+
     return {
       gamesStarted,
       gamesOwned,
@@ -541,7 +541,7 @@ export const OverallTab: VFC<OverallTabProps> = ({
                 total={overallProgress.total_achievements}
               />
             </PanelSectionRow>
-            
+
             {/* Key Statistics Grid */}
             <PanelSectionRow>
               <div style={{
@@ -566,7 +566,7 @@ export const OverallTab: VFC<OverallTabProps> = ({
                     of {overallProgress.total_games} owned
                   </div>
                 </div>
-                
+
                 {/* Perfect Games */}
                 <div style={{
                   backgroundColor: "rgba(255,215,0,0.1)",
@@ -585,12 +585,12 @@ export const OverallTab: VFC<OverallTabProps> = ({
                 </div>
               </div>
             </PanelSectionRow>
-            
+
             {/* Detailed Stats */}
             <PanelSectionRow>
               <div style={{ marginTop: "8px" }}>
-                <div style={{ 
-                  display: "flex", 
+                <div style={{
+                  display: "flex",
                   justifyContent: "space-between",
                   padding: "6px 0",
                   borderBottom: "1px solid rgba(255,255,255,0.1)"
@@ -602,9 +602,9 @@ export const OverallTab: VFC<OverallTabProps> = ({
                     {stats?.unlockRate || 0}%
                   </span>
                 </div>
-                
-                <div style={{ 
-                  display: "flex", 
+
+                <div style={{
+                  display: "flex",
                   justifyContent: "space-between",
                   padding: "6px 0",
                   borderBottom: "1px solid rgba(255,255,255,0.1)"
@@ -616,9 +616,9 @@ export const OverallTab: VFC<OverallTabProps> = ({
                     {stats?.avgUnlockedPerGame || 0}
                   </span>
                 </div>
-                
-                <div style={{ 
-                  display: "flex", 
+
+                <div style={{
+                  display: "flex",
                   justifyContent: "space-between",
                   padding: "6px 0"
                 }}>
@@ -631,7 +631,7 @@ export const OverallTab: VFC<OverallTabProps> = ({
                 </div>
               </div>
             </PanelSectionRow>
-            
+
             {/* Completion Milestones */}
             {milestone && overallProgress.unlocked_achievements > 0 && (
               <PanelSectionRow>
@@ -648,10 +648,10 @@ export const OverallTab: VFC<OverallTabProps> = ({
                   <div style={{ fontSize: "13px" }}>
                     <span>{milestone.title} - {milestone.description}</span>
                   </div>
-                  <div style={{ 
-                    fontSize: "10px", 
-                    opacity: 0.6, 
-                    marginTop: "4px" 
+                  <div style={{
+                    fontSize: "10px",
+                    opacity: 0.6,
+                    marginTop: "4px"
                   }}>
                     Next: {milestone.next}
                   </div>
@@ -663,9 +663,9 @@ export const OverallTab: VFC<OverallTabProps> = ({
           <PanelSectionRow>
             <div style={{ opacity: 0.6, textAlign: "center", padding: "20px" }}>
               {isLoading ? (
-                <LoadingSpinner 
-                  message="Calculating overall progress..." 
-                  size="large" 
+                <LoadingSpinner
+                  message="Calculating overall progress..."
+                  size="large"
                 />
               ) : (
                 <>
@@ -679,7 +679,7 @@ export const OverallTab: VFC<OverallTabProps> = ({
             </div>
           </PanelSectionRow>
         )}
-        
+
         <PanelSectionRow>
           <ButtonItem
             layout="below"
@@ -687,18 +687,18 @@ export const OverallTab: VFC<OverallTabProps> = ({
             disabled={isLoading}
           >
             <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px" }}>
-              <FaSync 
-                style={{ 
+              <FaSync
+                style={{
                   fontSize: "12px",
                   animation: isLoading ? "spin 1s linear infinite" : "none"
-                }} 
+                }}
               />
               {isLoading ? "Calculating..." : "Calculate Progress"}
             </div>
           </ButtonItem>
         </PanelSectionRow>
       </PanelSection>
-      
+
       {/* Recently Played Games Section */}
       {recentlyPlayedGames && recentlyPlayedGames.length > 0 && (
         <PanelSection title="Recently Played Games">
@@ -727,11 +727,11 @@ export const OverallTab: VFC<OverallTabProps> = ({
               disabled={isLoading}
             >
               <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px" }}>
-                <FaSync 
-                  style={{ 
+                <FaSync
+                  style={{
                     fontSize: "12px",
                     animation: isLoading ? "spin 1s linear infinite" : "none"
-                  }} 
+                  }}
                 />
                 {isLoading ? "Loading..." : "Refresh Recently Played"}
               </div>
@@ -739,7 +739,7 @@ export const OverallTab: VFC<OverallTabProps> = ({
           </PanelSectionRow>
         </PanelSection>
       )}
-      
+
       {/* Load Recently Played Button - when no games are loaded */}
       {(!recentlyPlayedGames || recentlyPlayedGames.length === 0) && (
         <PanelSection>
@@ -750,11 +750,11 @@ export const OverallTab: VFC<OverallTabProps> = ({
               disabled={isLoading}
             >
               <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px" }}>
-                <FaSync 
-                  style={{ 
+                <FaSync
+                  style={{
                     fontSize: "12px",
                     animation: isLoading ? "spin 1s linear infinite" : "none"
-                  }} 
+                  }}
                 />
                 {isLoading ? "Loading..." : "Load Recently Played Games"}
               </div>
@@ -762,7 +762,7 @@ export const OverallTab: VFC<OverallTabProps> = ({
           </PanelSectionRow>
         </PanelSection>
       )}
-      
+
       {/* Perfect Games Section */}
       {overallProgress?.perfect_games && overallProgress.perfect_games.length > 0 && (
         <PanelSection title="Perfect Games">

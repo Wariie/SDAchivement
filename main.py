@@ -62,12 +62,14 @@ class Plugin:
             
             # Get current user if not set
             if not self.current_user_id:
-                detected_user = await self.game_detector.get_current_steam_user()
-                if detected_user:
-                    decky.logger.info(f"Auto-detected Steam user: {detected_user}")
+                user_result = await self.game_detector.get_current_steam_user()
+                if user_result and not user_result.get("error"):
+                    detected_user = user_result["user_id"]
+                    decky.logger.info(f"Auto-detected Steam user: {detected_user} (source: {user_result.get('source', 'unknown')})")
                     await self.set_steam_user_id(detected_user)
                 else:
-                    decky.logger.warning("No Steam user ID detected - plugin will need manual configuration")
+                    error_msg = user_result.get("error", "Unknown error") if user_result else "No response"
+                    decky.logger.warning(f"No Steam user ID detected: {error_msg} - plugin will need manual configuration")
 
             # Initialize API and achievement service
             if self.steam_api_key and self.current_user_id:
@@ -291,14 +293,19 @@ class Plugin:
     
     async def get_current_game(self) -> Optional[Dict]:
         """Get currently running game"""
-        return await self.game_detector.get_current_game(self.test_app_id, self.api)
+        result = await self.game_detector.get_current_game(self.test_app_id, self.api)
+        # Return None if there's an error to maintain compatibility with existing code
+        return result if result and not result.get("error") else None
     
     async def get_current_steam_user(self) -> Optional[str]:
         """Get current Steam user ID"""
-        user_id = await self.game_detector.get_current_steam_user()
-        if user_id and not self.current_user_id:
-            await self.set_steam_user_id(user_id)
-        return user_id
+        user_result = await self.game_detector.get_current_steam_user()
+        if user_result and not user_result.get("error"):
+            user_id = user_result["user_id"]
+            if user_id and not self.current_user_id:
+                await self.set_steam_user_id(user_id)
+            return user_id
+        return None
     
     async def get_game_info(self, app_id: int) -> Dict:
         """Get game information"""
@@ -369,7 +376,9 @@ class Plugin:
                 return []
                 
             response = await self.api.get_recently_played_games()
-            if not response or "response" not in response or "games" not in response["response"]:
+            if not response or response.get("error") or "response" not in response or "games" not in response["response"]:
+                if response and response.get("error"):
+                    decky.logger.error(f"Failed to get recently played games: {response['error']}")
                 return []
                 
             games = response["response"]["games"][:count]
@@ -389,7 +398,7 @@ class Plugin:
                 # Get header image from app details
                 try:
                     app_details = await self.api.get_app_details(game["appid"])
-                    if app_details:
+                    if app_details and not app_details.get("error"):
                         enhanced_game["header_image"] = app_details.get("header_image", "")
                         enhanced_game["has_achievements"] = app_details.get("has_achievements", False)
                         enhanced_game["achievement_count"] = app_details.get("achievement_count", 0)

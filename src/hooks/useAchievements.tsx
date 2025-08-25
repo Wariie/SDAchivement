@@ -1,18 +1,18 @@
 // hooks/useAchievements.tsx
 import { useState, useCallback } from "react";
 import { toaster } from "@decky/api";
-import { 
-  getAchievements, 
-  getRecentAchievements, 
+import {
+  getAchievements,
+  getRecentAchievements,
   getAchievementProgress,
   getRecentlyPlayedGames,
-  refreshCache 
+  refreshCache
 } from "../services/api";
-import { 
-  AchievementData, 
-  RecentAchievement, 
+import {
+  AchievementData,
+  RecentAchievement,
   OverallProgress,
-  GameInfo 
+  GameInfo
 } from "../models";
 
 export interface UseAchievementsReturn {
@@ -23,7 +23,7 @@ export interface UseAchievementsReturn {
   overallProgress: OverallProgress | null;
   isLoading: boolean;
   loadingMessage: string;
-  
+
   // Actions
   fetchAchievements: (appId?: number) => Promise<void>;
   fetchRecentAchievements: () => Promise<void>;
@@ -174,7 +174,7 @@ export const useAchievements = (): UseAchievementsReturn => {
     overallProgress,
     isLoading,
     loadingMessage,
-    
+
     // Actions
     fetchAchievements,
     fetchRecentAchievements,

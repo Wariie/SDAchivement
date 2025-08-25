@@ -1,19 +1,19 @@
 // components/tabs/SettingsTabModal.tsx - Modal-based settings redesign
 import { VFC, useCallback } from "react";
-import { 
-  PanelSection, 
-  PanelSectionRow, 
-  ButtonItem, 
+import {
+  PanelSection,
+  PanelSectionRow,
+  ButtonItem,
   showModal,
   MenuItem,
   Menu,
   showContextMenu
 } from "@decky/ui";
-import { 
-  FaKey, 
-  FaCog, 
-  FaSync, 
-  FaEye, 
+import {
+  FaKey,
+  FaCog,
+  FaSync,
+  FaEye,
   FaTrash,
   FaGamepad,
   FaUser,
@@ -37,18 +37,18 @@ interface SettingsTabModalProps {
   onClearTrackedGame: () => Promise<void>;
 }
 
-export const SettingsTabModal: VFC<SettingsTabModalProps> = ({ 
-  settings, 
-  installedGames, 
-  trackedGame, 
-  onFullRefresh, 
-  onSetTrackedGame, 
-  onClearTrackedGame 
+export const SettingsTabModal: VFC<SettingsTabModalProps> = ({
+  settings,
+  installedGames,
+  trackedGame,
+  onFullRefresh,
+  onSetTrackedGame,
+  onClearTrackedGame
 }) => {
-  
+
   const handleOpenApiKeyModal = useCallback(() => {
     let modalInstance: any = null;
-    
+
     modalInstance = showModal(
       <ApiKeyModal
         currentApiKey={settings.steamApiKey}
@@ -66,7 +66,7 @@ export const SettingsTabModal: VFC<SettingsTabModalProps> = ({
 
   const handleOpenAdvancedSettings = useCallback(() => {
     let modalInstance: any = null;
-    
+
     modalInstance = showModal(
       <AdvancedSettingsModal
         currentTestGameId={settings.testGameId}
@@ -88,7 +88,7 @@ export const SettingsTabModal: VFC<SettingsTabModalProps> = ({
     }
 
     let modalInstance: any = null;
-    
+
     modalInstance = showModal(
       <GameSelectionModal
         games={installedGames}
@@ -125,28 +125,28 @@ export const SettingsTabModal: VFC<SettingsTabModalProps> = ({
       {/* Quick Status Overview */}
       <PanelSection title="Configuration Status">
         <PanelSectionRow>
-          <div style={{ 
+          <div style={{
             display: "flex",
             justifyContent: "center",
             marginBottom: "8px"
           }}>
             {/* API Key Status */}
-            <div style={{ 
+            <div style={{
               padding: "12px",
-              backgroundColor: settings.apiKeySet ? 
+              backgroundColor: settings.apiKeySet ?
                 "rgba(76, 175, 80, 0.1)" : "rgba(244, 67, 54, 0.1)",
               borderRadius: "8px",
               border: `1px solid ${settings.apiKeySet ? '#4CAF50' : '#F44336'}40`,
               width: "100%",
               maxWidth: "300px"
             }}>
-              <div style={{ 
-                display: "flex", 
-                alignItems: "center", 
+              <div style={{
+                display: "flex",
+                alignItems: "center",
                 gap: "8px",
                 marginBottom: "4px",
                 }}>
-                {settings.apiKeySet ? 
+                {settings.apiKeySet ?
                   <FaCheck style={{ color: "#4CAF50", fontSize: "14px" }} /> :
                   <FaTimes style={{ color: "#F44336", fontSize: "14px" }} />
                 }
@@ -160,9 +160,9 @@ export const SettingsTabModal: VFC<SettingsTabModalProps> = ({
 
         {settings.steamUserId && (
           <PanelSectionRow>
-            <div style={{ 
-              display: "flex", 
-              alignItems: "center", 
+            <div style={{
+              display: "flex",
+              alignItems: "center",
               justifyContent: "center",
               gap: "8px",
               fontSize: "12px",
@@ -183,7 +183,7 @@ export const SettingsTabModal: VFC<SettingsTabModalProps> = ({
             layout="below"
             onClick={handleOpenApiKeyModal}
           >
-            <div style={{ 
+            <div style={{
               display: "flex",
               textAlign: "left",
               gap: "10px",
@@ -207,7 +207,7 @@ export const SettingsTabModal: VFC<SettingsTabModalProps> = ({
             layout="below"
             onClick={handleOpenAdvancedSettings}
           >
-            <div style={{ 
+            <div style={{
               display: "flex",
               textAlign: "left",
               gap: "10px",
@@ -230,9 +230,9 @@ export const SettingsTabModal: VFC<SettingsTabModalProps> = ({
       {/* Auto Refresh Settings */}
       <PanelSection title="Auto Refresh">
         <PanelSectionRow>
-          <div style={{ 
-            display: "flex", 
-            justifyContent: "space-between", 
+          <div style={{
+            display: "flex",
+            justifyContent: "space-between",
             alignItems: "center",
             marginBottom: "8px"
           }}>
@@ -244,7 +244,7 @@ export const SettingsTabModal: VFC<SettingsTabModalProps> = ({
                 Update automatically while viewing current game
               </div>
             </div>
-            <div style={{ 
+            <div style={{
               padding: "4px 8px",
               borderRadius: "12px",
               backgroundColor: settings.autoRefresh ? "rgba(76, 175, 80, 0.2)" : "rgba(158, 158, 158, 0.2)",
@@ -262,9 +262,9 @@ export const SettingsTabModal: VFC<SettingsTabModalProps> = ({
             layout="below"
             onClick={() => settings.saveAutoRefresh(!settings.autoRefresh)}
           >
-            <div style={{ 
-              display: "flex", 
-              alignItems: "center", 
+            <div style={{
+              display: "flex",
+              alignItems: "center",
               gap: "8px",
               fontSize: "14px"
             }}>
@@ -273,7 +273,7 @@ export const SettingsTabModal: VFC<SettingsTabModalProps> = ({
             </div>
           </ButtonItem>
         </PanelSectionRow>
-        
+
         {settings.autoRefresh && (
           <PanelSectionRow>
             <ButtonItem
@@ -297,15 +297,15 @@ export const SettingsTabModal: VFC<SettingsTabModalProps> = ({
                 );
               }}
             >
-              <div style={{ 
-                display: "flex", 
-                alignItems: "center", 
+              <div style={{
+                display: "flex",
+                alignItems: "center",
                 gap: "8px",
                 fontSize: "14px"
               }}>
                 <FaCog style={{ fontSize: "12px" }} />
-                Interval: {settings.refreshInterval < 60 ? 
-                  `${settings.refreshInterval} seconds` : 
+                Interval: {settings.refreshInterval < 60 ?
+                  `${settings.refreshInterval} seconds` :
                   `${settings.refreshInterval / 60} minutes`}
               </div>
             </ButtonItem>
@@ -320,20 +320,20 @@ export const SettingsTabModal: VFC<SettingsTabModalProps> = ({
             Track achievements for a specific game even when not running
           </div>
         </PanelSectionRow>
-        
+
         {trackedGame ? (
           <>
             <PanelSectionRow>
-              <div style={{ 
+              <div style={{
                 padding: "12px",
                 backgroundColor: "rgba(74, 158, 255, 0.1)",
                 borderRadius: "8px",
                 border: "1px solid rgba(74, 158, 255, 0.3)",
                 marginBottom: "8px"
               }}>
-                <div style={{ 
-                  display: "flex", 
-                  alignItems: "center", 
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
                   gap: "8px",
                   marginBottom: "6px"
                 }}>
@@ -347,15 +347,15 @@ export const SettingsTabModal: VFC<SettingsTabModalProps> = ({
                 </div>
               </div>
             </PanelSectionRow>
-            
+
             <PanelSectionRow>
               <ButtonItem
                 layout="below"
                 onClick={handleSelectTrackedGame}
               >
-                <div style={{ 
-                  display: "flex", 
-                  alignItems: "center", 
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
                   gap: "8px",
                   fontSize: "14px"
                 }}>
@@ -376,9 +376,9 @@ export const SettingsTabModal: VFC<SettingsTabModalProps> = ({
                   }
                 }}
               >
-                <div style={{ 
-                  display: "flex", 
-                  alignItems: "center", 
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
                   gap: "8px",
                   fontSize: "14px"
                 }}>
@@ -394,9 +394,9 @@ export const SettingsTabModal: VFC<SettingsTabModalProps> = ({
               layout="below"
               onClick={handleSelectTrackedGame}
             >
-              <div style={{ 
-                display: "flex", 
-                alignItems: "center", 
+              <div style={{
+                display: "flex",
+                alignItems: "center",
                 gap: "8px",
                 fontSize: "14px"
               }}>
@@ -415,9 +415,9 @@ export const SettingsTabModal: VFC<SettingsTabModalProps> = ({
             layout="below"
             onClick={handleClearCache}
           >
-            <div style={{ 
-              display: "flex", 
-              alignItems: "center", 
+            <div style={{
+              display: "flex",
+              alignItems: "center",
               gap: "8px",
               fontSize: "14px"
             }}>
@@ -426,15 +426,15 @@ export const SettingsTabModal: VFC<SettingsTabModalProps> = ({
             </div>
           </ButtonItem>
         </PanelSectionRow>
-        
+
         <PanelSectionRow>
           <ButtonItem
             layout="below"
             onClick={settings.handleReloadSettings}
           >
-            <div style={{ 
-              display: "flex", 
-              alignItems: "center", 
+            <div style={{
+              display: "flex",
+              alignItems: "center",
               gap: "8px",
               fontSize: "14px"
             }}>
@@ -443,7 +443,7 @@ export const SettingsTabModal: VFC<SettingsTabModalProps> = ({
             </div>
           </ButtonItem>
         </PanelSectionRow>
-        
+
         <PanelSectionRow>
           <div style={{ fontSize: "11px", opacity: 0.6 }}>
             Use if settings aren't updating properly

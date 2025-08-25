@@ -109,6 +109,31 @@ Released under the **BSD-3-Clause License** – see [LICENSE](LICENSE) for detai
 
 ---
 
+## Development References
+
+  This plugin was developed using the official Decky plugin template and studying community plugins for best practices:
+
+  ### **Primary Template & Documentation:**
+  - **[Decky Plugin Template](https://github.com/SteamDeckHomebrew/decky-plugin-template)** - Official template used as the foundation for plugin structure, build configuration, and basic setup
+  - **[Decky Loader Wiki](https://wiki.deckbrew.xyz/)** - Referenced for plugin development guidelines, Python backend patterns, and API documentation
+
+  ### **Community Plugin References:**
+  - **[decky-brightness-bar](https://github.com/rasitayaz/decky-brightness-bar)** - Referenced for basic plugin patterns and TypeScript configuration
+  - **[Decky-Framegen](https://github.com/xXJSONDeruloXx/Decky-Framegen)** - Studied for `useEffect` cleanup patterns and async operation handling
+  - **[TabMaster](https://github.com/Tormak9970/TabMaster)** - Referenced for context provider patterns and component organization
+  - **[MicroSDeck](https://github.com/CEbbinghaus/MicroSDeck)** - Studied for list rendering and TypeScript interface patterns
+  - **[HueSync](https://github.com/honjow/HueSync)** - Referenced for settings modal structure and Python backend patterns
+  - **[SDH-CssLoader](https://github.com/DeckThemes/SDH-CssLoader)** - Studied for state management patterns and Python service architecture
+
+  ### **External APIs:**
+  - **[Steam Web API Documentation](https://steamcommunity.com/dev)** - Official Steam API documentation for achievement and user data endpoints
+
+  ## **Original Implementation**
+  All Steam achievement tracking logic, API integration, caching systems, and domain-specific components were developed independently. The referenced plugins and template served only as learning resources for Decky plugin
+  development patterns and best practices.
+
+---
+
 ## 🙏 Acknowledgments
 
 - [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader) community  

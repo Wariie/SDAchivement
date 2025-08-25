@@ -1,10 +1,10 @@
 // hooks/useSettings.tsx
 import { useState, useCallback, useRef } from "react";
 import { toaster } from "@decky/api";
-import { 
-  loadSettings, 
-  setSteamApiKey, 
-  setTestGame, 
+import {
+  loadSettings,
+  setSteamApiKey,
+  setTestGame,
   clearTestGame,
   reloadSettings,
   saveRefreshIntervalBackend,
@@ -23,11 +23,11 @@ export interface UseSettingsReturn {
   steamApiKey: string;
   trackedGame: TrackedGame | null;
   settingsLoaded: boolean;
-  
+
   // Setters
   setSteamApiKeyState: (key: string) => void;
   setTestGameId: (id: string) => void;
-  
+
   // Actions
   loadPluginSettings: () => Promise<void>;
   saveApiKey: (apiKey?: string) => Promise<boolean>;
@@ -47,7 +47,7 @@ export const useSettings = (): UseSettingsReturn => {
   const [steamApiKey, setSteamApiKeyState] = useState("");
   const [trackedGame, setTrackedGame] = useState<TrackedGame | null>(null);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
-  
+
   const lastSavedInterval = useRef(30);
 
   const loadPluginSettings = useCallback(async () => {
@@ -64,7 +64,7 @@ export const useSettings = (): UseSettingsReturn => {
         } else {
           setTestGameId("");
         }
-        
+
         // Always set tracked game (including null/undefined to clear it)
         setTrackedGame(result.tracked_game || null);
         setSettingsLoaded(true);
@@ -77,22 +77,21 @@ export const useSettings = (): UseSettingsReturn => {
   const saveApiKey = useCallback(async (apiKey?: string) => {
     try {
       const keyToSave = apiKey || steamApiKey;
-      
+
       const success = await setSteamApiKey(keyToSave);
       if (success) {
         // Update local state
         setSteamApiKeyState(keyToSave);
         setApiKeySet(true);
-        
+
         // Clear cache since API key changed - fresh start with new key
         try {
           await refreshCache();
-          console.log("Cache cleared after API key change");
         } catch (cacheError) {
           console.warn("Failed to clear cache after API key change:", cacheError);
           // Don't fail the whole operation if cache clear fails
         }
-        
+
         const reloaded = await loadSettings();
         if (reloaded) {
           setSteamUserIdState(reloaded.steam_user_id || "");
@@ -132,7 +131,7 @@ export const useSettings = (): UseSettingsReturn => {
         });
         return false;
       }
-      
+
       const success = await setTestGame(appId);
       if (success) {
         toaster.toast({
@@ -185,7 +184,7 @@ export const useSettings = (): UseSettingsReturn => {
   const saveAutoRefresh = useCallback(async (enabled: boolean) => {
     try {
       setAutoRefresh(enabled);
-      
+
       try {
         const success = await saveAutoRefreshBackend(enabled);
         if (success) {
@@ -195,7 +194,6 @@ export const useSettings = (): UseSettingsReturn => {
           });
         }
       } catch (backendError) {
-        console.log("Backend save not available for auto-refresh, using local state only:", backendError);
       }
     } catch (error) {
       console.error("Failed to save auto-refresh setting:", error);
@@ -210,7 +208,7 @@ export const useSettings = (): UseSettingsReturn => {
 
     try {
       setRefreshInterval(interval);
-      
+
       try {
         const success = await saveRefreshIntervalBackend(interval);
         if (success) {
@@ -221,7 +219,6 @@ export const useSettings = (): UseSettingsReturn => {
           });
         }
       } catch (backendError) {
-        console.log("Backend save not available, using local state only");
       }
     } catch (error) {
       console.error("Failed to save refresh interval:", error);
@@ -242,7 +239,7 @@ export const useSettings = (): UseSettingsReturn => {
         } else {
           setTestGameId("");
         }
-        
+
         // Always set tracked game (including null/undefined to clear it)
         setTrackedGame(reloaded.tracked_game || null);
         setSettingsLoaded(true);
@@ -277,11 +274,11 @@ export const useSettings = (): UseSettingsReturn => {
     steamApiKey,
     trackedGame,
     settingsLoaded,
-    
+
     // Setters
     setSteamApiKeyState,
     setTestGameId,
-    
+
     // Actions
     loadPluginSettings,
     saveApiKey,
