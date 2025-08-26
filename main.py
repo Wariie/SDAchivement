@@ -31,7 +31,7 @@ class Plugin:
         self.game_detector = GameDetectorService()
         self.cache_service = CacheService(self.cache_dir)
         self.steam_scanner = SteamScannerService()
-
+        
         # These will be initialized after settings are loaded
         self.achievement_service = None
         self.api: Optional[SteamAPI] = None
@@ -211,6 +211,19 @@ class Plugin:
             return success
         except Exception as e:
             decky.logger.error(f"Failed to set API key: {e}")
+            return False
+    
+    async def set_steam_user_id(self, user_id: str) -> bool:
+        """Set Steam user ID"""
+        try:
+            success = await self.settings_service.set_user_id(user_id)
+            if success:
+                self.current_user_id = user_id
+                await self._reinitialize_api()
+                decky.logger.info("User ID set and services reinitialized")
+            return success
+        except Exception as e:
+            decky.logger.error(f"Failed to set user ID: {e}")
             return False
         
     async def set_tracked_game(self, app_id: int, name: str) -> bool:
