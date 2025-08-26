@@ -17,6 +17,7 @@ export const AchievementDetailsModal: VFC<AchievementDetailsModalProps> = ({
     <ConfirmModal
       strTitle={achievement.display_name}
       onOK={closeModal}
+      onCancel={closeModal}
       strOKButtonText="Close"
       bHideCloseIcon={false}
     >

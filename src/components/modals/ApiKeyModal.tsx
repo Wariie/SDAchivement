@@ -7,7 +7,7 @@ import {
   PanelSection,
   PanelSectionRow
 } from "@decky/ui";
-import { FaKey, FaExternalLinkAlt, FaCheck, FaTimes } from "react-icons/fa";
+import { FaKey, FaExternalLinkAlt, FaCheck, FaTimes, FaClipboard } from "react-icons/fa";
 
 interface ApiKeyModalProps {
   currentApiKey: string;
@@ -23,6 +23,7 @@ export const ApiKeyModal: VFC<ApiKeyModalProps> = ({
   const [apiKey, setApiKey] = useState(currentApiKey);
   const [isSaving, setIsSaving] = useState(false);
   const [validationMessage, setValidationMessage] = useState("");
+  const [isGamingMode, setIsGamingMode] = useState(false);
 
   useEffect(() => {
     setApiKey(currentApiKey);
@@ -47,6 +48,23 @@ export const ApiKeyModal: VFC<ApiKeyModalProps> = ({
     }
   };
 
+  // Add this useEffect to detect Gaming Mode:
+  useEffect(() => {
+    const checkGamingMode = () => {
+      SteamClient.UI.GetUIMode()
+        .then(mode => {
+          console.log("Current UI Mode:", mode);
+          setIsGamingMode(mode === 4)
+        })
+        .catch(err => {
+          console.error("Failed to get UI mode:", err);
+          setIsGamingMode(true);
+        })// Default to false on error
+    };
+
+    checkGamingMode();
+  }, []);
+
   const handleSave = async () => {
     if (!validateApiKey(apiKey)) {
       setValidationMessage("Please enter a valid Steam API key");
@@ -68,13 +86,14 @@ export const ApiKeyModal: VFC<ApiKeyModalProps> = ({
     }
   };
 
-
   return (
     <ModalRoot onCancel={closeModal}>
       <div style={{
         padding: "20px",
-        minWidth: "400px",
-        maxWidth: "500px"
+        width: "100%",
+        maxWidth: "500px", 
+        minHeight: "0",
+        margin: "0 auto" 
       }}>
         <PanelSection title="">
           <div style={{
@@ -125,6 +144,65 @@ export const ApiKeyModal: VFC<ApiKeyModalProps> = ({
             </div>
           </PanelSectionRow>
 
+          {isGamingMode ? (
+            <PanelSectionRow>
+              <div style={{
+                backgroundColor: "rgba(255, 193, 7, 0.1)",
+                padding: "12px",
+                borderRadius: "8px",
+                marginBottom: "15px",
+                border: "1px solid rgba(255, 193, 7, 0.3)"
+              }}>
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  marginBottom: "8px"
+                }}>
+                  <FaClipboard style={{ fontSize: "12px", color: "#ffc107" }} />
+                  <strong style={{ fontSize: "13px", color: "#ffc107" }}>Gaming Mode Notice</strong>
+                </div>
+                <p style={{
+                  margin: "0",
+                  fontSize: "12px",
+                  opacity: 0.9,
+                  lineHeight: "1.3"
+                }}>
+                  Clipboard paste is restricted in Gaming Mode for security.
+                  Please type your API key manually or switch to Desktop Mode for paste functionality.
+                </p>
+              </div>
+            </PanelSectionRow>
+          ) : (
+            <PanelSectionRow>
+              <div style={{
+                backgroundColor: "rgba(76, 175, 80, 0.1)",
+                padding: "12px",
+                borderRadius: "8px",
+                marginBottom: "15px",
+                border: "1px solid rgba(76, 175, 80, 0.3)"
+              }}>
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  marginBottom: "8px"
+                }}>
+                  <FaClipboard style={{ fontSize: "12px", color: "#4CAF50" }} />
+                  <strong style={{ fontSize: "13px", color: "#4CAF50" }}>Desktop Mode Tip</strong>
+                </div>
+                <p style={{
+                  margin: "0",
+                  fontSize: "12px",
+                  opacity: 0.9,
+                  lineHeight: "1.3"
+                }}>
+                  Copy your API key, then click in the text field below and use the paste button on the virtual keyboard.
+                </p>
+              </div>
+            </PanelSectionRow>
+          )}
+
           <PanelSectionRow>
             <TextField
               label="Steam API Key"
@@ -155,26 +233,30 @@ export const ApiKeyModal: VFC<ApiKeyModalProps> = ({
           )}
         </PanelSection>
 
-        <div style={{
-          display: "flex",
-          gap: "10px",
-          marginTop: "20px",
-          justifyContent: "flex-end"
-        }}>
-          <ButtonItem
-            onClick={closeModal}
-            disabled={isSaving}
-          >
-            Cancel
-          </ButtonItem>
+        <PanelSection>
+          <PanelSectionRow>
+            <div style={{
+              display: "flex",
+              gap: "10px",
+              justifyContent: "flex-end",
+              width: "100%"
+            }}>
+              <ButtonItem
+                onClick={closeModal}
+                disabled={isSaving}
+              >
+                Cancel
+              </ButtonItem>
 
-          <ButtonItem
-            onClick={handleSave}
-            disabled={!validateApiKey(apiKey) || isSaving}
-          >
-            {isSaving ? "Saving..." : "Save API Key"}
-          </ButtonItem>
-        </div>
+              <ButtonItem
+                onClick={handleSave}
+                disabled={!validateApiKey(apiKey) || isSaving}
+              >
+                {isSaving ? "Saving..." : "Save API Key"}
+              </ButtonItem>
+            </div>
+          </PanelSectionRow>
+        </PanelSection>
       </div>
     </ModalRoot>
   );

@@ -118,12 +118,13 @@ Released under the **BSD-3-Clause License** – see [LICENSE](LICENSE) for detai
   - **[Decky Loader Wiki](https://wiki.deckbrew.xyz/)** - Referenced for plugin development guidelines, Python backend patterns, and API documentation
 
   ### **Community Plugin References:**
-  - **[decky-brightness-bar](https://github.com/rasitayaz/decky-brightness-bar)** - Referenced for basic plugin patterns and TypeScript configuration
-  - **[Decky-Framegen](https://github.com/xXJSONDeruloXx/Decky-Framegen)** - Studied for `useEffect` cleanup patterns and async operation handling
-  - **[TabMaster](https://github.com/Tormak9970/TabMaster)** - Referenced for context provider patterns and component organization
-  - **[MicroSDeck](https://github.com/CEbbinghaus/MicroSDeck)** - Studied for list rendering and TypeScript interface patterns
-  - **[HueSync](https://github.com/honjow/HueSync)** - Referenced for settings modal structure and Python backend patterns
+  - **[decky-brightness-bar](https://github.com/rasitayaz/decky-brightness-bar)** - Basic plugin patterns
+  - **[Decky-Framegen](https://github.com/xXJSONDeruloXx/Decky-Framegen)** - `useEffect` cleanup patterns and async operation handling
+  - **[TabMaster](https://github.com/Tormak9970/TabMaster)** - Context provider patterns and component organization
+  - **[MicroSDeck](https://github.com/CEbbinghaus/MicroSDeck)** - List rendering and TypeScript interface patterns
+  - **[HueSync](https://github.com/honjow/HueSync)** - Python backend integration patterns
   - **[SDH-CssLoader](https://github.com/DeckThemes/SDH-CssLoader)** - Studied for state management patterns and Python service architecture
+  - **[decky-lossless-scaling-vk](https://github.com/xXJSONDeruloXx/decky-lossless-scaling-vk)** - Research on issue pasting text from clipboard functionality  
 
   ### **External APIs:**
   - **[Steam Web API Documentation](https://steamcommunity.com/dev)** - Official Steam API documentation for achievement and user data endpoints

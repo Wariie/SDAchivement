@@ -14,6 +14,7 @@ export {
   FaExchangeAlt,
   FaLock,
   FaClock,
+  FaClipboard,
   FaStar,
   FaCog,
   FaHistory,
