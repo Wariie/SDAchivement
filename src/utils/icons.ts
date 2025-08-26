@@ -1,11 +1,11 @@
 // Centralized icon exports for better tree-shaking and consistency
-export { 
+export {
   FaGamepad,
-  FaSync, 
-  FaEye, 
-  FaTimes, 
-  FaPlus, 
-  FaPlay, 
+  FaSync,
+  FaEye,
+  FaTimes,
+  FaPlus,
+  FaPlay,
   FaBullseye,
   FaChartLine,
   FaTrophy,
@@ -14,6 +14,7 @@ export {
   FaExchangeAlt,
   FaLock,
   FaClock,
+  FaClipboard,
   FaStar,
   FaCog,
   FaHistory,

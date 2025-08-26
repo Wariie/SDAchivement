@@ -62,32 +62,41 @@ class SteamAPI:
     # User & Games
     # ---------------------------
 
-    async def get_player_summaries(self, steam_id: Optional[str] = None) -> Dict | None:
+    async def get_player_summaries(self, steam_id: Optional[str] = None) -> Dict:
         steam_id = steam_id or self.steam_id
         if not self.api_key or not steam_id:
-            return None
-        return await self._get(
+            return {"error": "Missing API key or Steam ID"}
+        
+        result = await self._get(
             f"{self.BASE_URL}/ISteamUser/GetPlayerSummaries/v2/",
             {"key": self.api_key, "steamids": steam_id},
         )
+        
+        return result if result else {"error": "Failed to fetch player summaries"}
 
-    async def get_owned_games(self, steam_id: Optional[str] = None) -> Dict | None:
+    async def get_owned_games(self, steam_id: Optional[str] = None) -> Dict:
         steam_id = steam_id or self.steam_id
         if not self.api_key or not steam_id:
-            return None
-        return await self._get(
+            return {"error": "Missing API key or Steam ID"}
+        
+        result = await self._get(
             f"{self.BASE_URL}/IPlayerService/GetOwnedGames/v1/",
             {"key": self.api_key, "steamid": steam_id, "include_appinfo": "1", "include_played_free_games": "1", "skip_unvetted_apps": "false"},
         )
+        
+        return result if result else {"error": "Failed to fetch owned games"}
 
-    async def get_recently_played_games(self, steam_id: Optional[str] = None) -> Dict | None:
+    async def get_recently_played_games(self, steam_id: Optional[str] = None) -> Dict:
         steam_id = steam_id or self.steam_id
         if not self.api_key or not steam_id:
-            return None
-        return await self._get(
+            return {"error": "Missing API key or Steam ID"}
+        
+        result = await self._get(
             f"{self.BASE_URL}/IPlayerService/GetRecentlyPlayedGames/v1/",
             {"key": self.api_key, "steamid": steam_id, "count": 10},
         )
+        
+        return result if result else {"error": "Failed to fetch recently played games"}
 
     async def get_recent_achievements(self, limit: int = 10) -> List[Dict]:
         """Get recently unlocked achievements across all games"""
@@ -142,24 +151,30 @@ class SteamAPI:
     # Achievements & Stats
     # ---------------------------
 
-    async def get_schema_for_game(self, app_id: int) -> Optional[Dict]:
+    async def get_schema_for_game(self, app_id: int) -> Dict:
         if not self.api_key:
-            return None
-        return await self._get(
+            return {"error": "Missing API key"}
+        
+        result = await self._get(
             f"{self.BASE_URL}/ISteamUserStats/GetSchemaForGame/v2/",
             {"key": self.api_key, "appid": app_id, "l": "english"},
         )
+        
+        return result if result else {"error": f"Failed to fetch schema for app {app_id}"}
 
-    async def get_player_achievements_raw(self, app_id: int, steam_id: Optional[str] = None) -> Optional[Dict]:
+    async def get_player_achievements_raw(self, app_id: int, steam_id: Optional[str] = None) -> Dict:
         steam_id = steam_id or self.steam_id
         if not self.api_key or not steam_id:
-            return None
-        return await self._get(
+            return {"error": "Missing API key or Steam ID"}
+        
+        result = await self._get(
             f"{self.BASE_URL}/ISteamUserStats/GetPlayerAchievements/v1/",
             {"key": self.api_key, "steamid": steam_id, "appid": app_id, "l": "english"},
         )
+        
+        return result if result else {"error": f"Failed to fetch achievements for app {app_id}"}
 
-    async def get_player_achievements(self, app_id: int, steam_id: Optional[str] = None) -> Optional[Dict]:
+    async def get_player_achievements(self, app_id: int, steam_id: Optional[str] = None) -> Dict:
         """Get formatted achievement data for a player"""
         steam_id = steam_id or self.steam_id
         if not self.api_key or not steam_id:
@@ -171,11 +186,11 @@ class SteamAPI:
             player = await self.get_player_achievements_raw(app_id, steam_id)
             global_stats = await self.get_global_achievements(app_id)
 
-            if not schema:
-                return {"error": "Failed to fetch achievement schema"}
+            if schema.get("error"):
+                return schema
             
-            if not player:
-                return {"error": "Failed to fetch player achievements"}
+            if player.get("error"):
+                return player
 
             # Parse schema achievements
             schema_achs = {}
@@ -258,28 +273,33 @@ class SteamAPI:
             logger.error(f"Failed to get player achievements for app {app_id}: {e}")
             return {"error": f"Failed to fetch achievement data: {str(e)}"}
 
-    async def get_global_achievements(self, app_id: int) -> Optional[Dict]:
+    async def get_global_achievements(self, app_id: int) -> Dict:
         """Get global achievement percentages"""
-        return await self._get(
+        result = await self._get(
             f"{self.BASE_URL}/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v2/",
             {"gameid": app_id},
         )
+        
+        return result if result else {"error": f"Failed to fetch global achievements for app {app_id}"}
 
-    async def get_user_stats_for_game(self, app_id: int, steam_id: Optional[str] = None) -> Optional[Dict]:
+    async def get_user_stats_for_game(self, app_id: int, steam_id: Optional[str] = None) -> Dict:
         """Get user statistics for a game"""
         steam_id = steam_id or self.steam_id
         if not self.api_key or not steam_id:
-            return None
-        return await self._get(
+            return {"error": "Missing API key or Steam ID"}
+        
+        result = await self._get(
             f"{self.BASE_URL}/ISteamUserStats/GetUserStatsForGame/v2/",
             {"key": self.api_key, "steamid": steam_id, "appid": app_id},
         )
+        
+        return result if result else {"error": f"Failed to fetch user stats for app {app_id}"}
 
     # ---------------------------
     # Store API (no key required)
     # ---------------------------
 
-    async def get_app_details(self, app_id: int) -> Dict | None:
+    async def get_app_details(self, app_id: int) -> Dict:
         """Get game details from Steam Store API"""
         try:
             # Check cache first
@@ -317,5 +337,7 @@ class SteamAPI:
                         
         except Exception as e:
             logger.error(f"Failed to get app details for {app_id}: {e}")
+            return {"error": f"Failed to fetch app details for {app_id}: {str(e)}"}
         
+        # Fallback data if API call fails but no exception occurred
         return {"app_id": app_id, "name": f"App {app_id}", "has_achievements": False, "achievement_count": 0}

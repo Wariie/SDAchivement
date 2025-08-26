@@ -9,14 +9,14 @@ interface GameSelectionModalProps {
   closeModal?: () => void;
 }
 
-export const GameSelectionModal: VFC<GameSelectionModalProps> = ({ 
-  games, 
-  onSelect, 
-  closeModal 
+export const GameSelectionModal: VFC<GameSelectionModalProps> = ({
+  games,
+  onSelect,
+  closeModal
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
-  
-  const filteredGames = games.filter(game => 
+
+  const filteredGames = games.filter(game =>
     game.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -35,9 +35,9 @@ export const GameSelectionModal: VFC<GameSelectionModalProps> = ({
           value={searchTerm}
           onChange={(e: any) => setSearchTerm(e.target.value)}
         />
-        
-        <div style={{ 
-          maxHeight: "300px", 
+
+        <div style={{
+          maxHeight: "300px",
           overflowY: "auto",
           marginTop: "10px"
         }}>
@@ -63,13 +63,13 @@ export const GameSelectionModal: VFC<GameSelectionModalProps> = ({
             ))}
           </Focusable>
         </div>
-        
+
         {filteredGames.length > 50 && (
-          <div style={{ 
-            marginTop: "10px", 
-            textAlign: "center", 
-            fontSize: "12px", 
-            opacity: 0.6 
+          <div style={{
+            marginTop: "10px",
+            textAlign: "center",
+            fontSize: "12px",
+            opacity: 0.6
           }}>
             Showing first 50 of {filteredGames.length} games
           </div>

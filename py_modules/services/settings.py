@@ -15,7 +15,6 @@ class SettingsService:
     def __init__(self, settings_dir: Path):
         self.settings_dir = settings_dir
         self.settings_file = settings_dir / "settings.json"
-        # ADD THESE LINES:
         self.settings = {}
         self.api_key = None
         self.user_id = None

@@ -6,9 +6,9 @@ import { GameBannerProps } from "../../models";
 import { useGameArtwork } from "../../hooks/useGameArtwork";
 import { formatPlaytime } from "../../services/formatters";
 
-export const GameBanner: VFC<GameBannerProps> = ({ 
-  game, 
-  isLoading, 
+export const GameBanner: VFC<GameBannerProps> = ({
+  game,
+  isLoading,
   onRefresh,
   trackedGame,
   onSetTrackedGame,
@@ -24,10 +24,10 @@ export const GameBanner: VFC<GameBannerProps> = ({
     return (
       <PanelSection>
         <PanelSectionRow>
-          <div style={{ 
-            textAlign: "center", 
+          <div style={{
+            textAlign: "center",
             padding: "20px",
-            opacity: 0.6 
+            opacity: 0.6
           }}>
             <FaGamepad style={{ fontSize: "32px", marginBottom: "8px" }} />
             <div>No game currently running</div>
@@ -45,7 +45,7 @@ export const GameBanner: VFC<GameBannerProps> = ({
             </div>
           </ButtonItem>
         </PanelSectionRow>
-        
+
         {/* Add tracking selection when no game */}
         {onSelectTrackedGame && (
           <PanelSectionRow>
@@ -79,7 +79,7 @@ export const GameBanner: VFC<GameBannerProps> = ({
       }}>
         {/* Background Image */}
         {getBestImage(game.header_image) && (
-          <img 
+          <img
             src={getBestImage(game.header_image)!}
             style={{
               width: "100%",
@@ -93,7 +93,7 @@ export const GameBanner: VFC<GameBannerProps> = ({
             alt=""
           />
         )}
-        
+
         {/* Overlay */}
         <div style={{
           position: "absolute",
@@ -103,7 +103,7 @@ export const GameBanner: VFC<GameBannerProps> = ({
           bottom: 0,
           background: "linear-gradient(to right, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.3) 100%)"
         }} />
-        
+
         {/* Top Left Pills - Only Test Mode */}
         {isTestMode && (
           <div style={{
@@ -171,7 +171,7 @@ export const GameBanner: VFC<GameBannerProps> = ({
               <FaPlay style={{ fontSize: "8px" }} />
               <span>LIVE</span>
             </div>
-            
+
             {/* Tracked Mode Option */}
             <div
               style={{
@@ -213,11 +213,11 @@ export const GameBanner: VFC<GameBannerProps> = ({
           }}>
             {displayName}
           </h3>
-          
+
           <div style={{ fontSize: "12px", opacity: 0.9, textShadow: "1px 1px 1px rgba(0,0,0,0.5)" }}>
             {/* Always show achievement count if available */}
-            {((game.achievement_count && game.achievement_count > 0) || 
-              (game.achievements && game.achievements > 0) || 
+            {((game.achievement_count && game.achievement_count > 0) ||
+              (game.achievements && game.achievements > 0) ||
               game.has_achievements) && (
               <div>{game.achievement_count || game.achievements || 0} achievements available</div>
             )}
@@ -228,7 +228,7 @@ export const GameBanner: VFC<GameBannerProps> = ({
           </div>
         </div>
       </div>
-      
+
       {/* Test mode warning */}
       {isTestMode && (
         <PanelSection>
@@ -246,7 +246,7 @@ export const GameBanner: VFC<GameBannerProps> = ({
           </PanelSectionRow>
         </PanelSection>
       )}
-      
+
       {/* Tracking Controls */}
       {onSetTrackedGame && onClearTrackedGame && onSelectTrackedGame && (
         <PanelSection>
@@ -264,7 +264,7 @@ export const GameBanner: VFC<GameBannerProps> = ({
               </ButtonItem>
             </PanelSectionRow>
           )}
-          
+
           {/* Tracked game controls */}
           {viewMode === "tracked" && trackedGame && (
             <>

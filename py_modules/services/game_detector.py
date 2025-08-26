@@ -12,14 +12,14 @@ from typing import Dict, Optional
 class GameDetectorService:
     """Handles game detection and Steam user identification"""
     
-    async def get_current_steam_user(self) -> Optional[str]:
+    async def get_current_steam_user(self) -> Dict:
         """Get current Steam user ID from system"""
         try:
             # Try environment variable
             steam_user = os.environ.get('STEAM_USER_ID')
             if steam_user:
                 decky.logger.info(f"Found Steam user ID from environment: {steam_user}")
-                return steam_user
+                return {"user_id": steam_user, "source": "environment"}
             
             # Try to read from Steam's loginusers.vdf
             steam_configs = [
@@ -38,18 +38,18 @@ class GameDetectorService:
                             if matches:
                                 steam_user = matches[0]
                                 decky.logger.info(f"Found Steam user ID from config: {steam_user}")
-                                return steam_user
+                                return {"user_id": steam_user, "source": "config"}
                     except Exception as e:
                         decky.logger.warning(f"Failed to read {steam_path}: {e}")
             
             decky.logger.warning("No Steam user ID found")
-            return None
+            return {"error": "No Steam user ID found"}
             
         except Exception as e:
             decky.logger.error(f"Failed to get Steam user: {e}")
-            return None
+            return {"error": f"Failed to get Steam user: {str(e)}"}
     
-    async def get_current_game(self, test_app_id: Optional[int], api) -> Optional[Dict]:
+    async def get_current_game(self, test_app_id: Optional[int], api) -> Dict:
         """Get currently running game"""
         try:
             # Check for test mode
@@ -66,8 +66,15 @@ class GameDetectorService:
                 }
             
             # Get the current app ID from Steam
-            app_id = await self._get_running_app_id()
-            decky.logger.info(f"Detected running app ID: {app_id}")
+            app_result = await self._get_running_app_id()
+            
+            if app_result and not app_result.get("error"):
+                app_id = app_result["app_id"]
+                decky.logger.info(f"Detected running app ID: {app_id} (source: {app_result.get('source', 'unknown')})")
+            else:
+                app_id = None
+                error_msg = app_result.get("error", "Unknown error") if app_result else "No response"
+                decky.logger.info(f"No running app detected: {error_msg}")
             
             if app_id and app_id != 0:
                 game_info = await self.get_game_info(app_id, api)
@@ -83,11 +90,11 @@ class GameDetectorService:
                 return result
             
             decky.logger.info("No game currently running")
-            return None
+            return {"error": "No game currently running"}
             
         except Exception as e:
             decky.logger.error(f"Failed to get current game: {e}")
-            return None
+            return {"error": f"Failed to get current game: {str(e)}"}
     
     async def get_game_info(self, app_id: int, api) -> Dict:
         """Get game information from Steam Store API"""
@@ -110,7 +117,7 @@ class GameDetectorService:
                 "achievement_count": 0
             }
     
-    async def _get_running_app_id(self) -> Optional[int]:
+    async def _get_running_app_id(self) -> Dict:
         """Get the currently running Steam app ID"""
         try:
             decky.logger.info("Detecting running Steam app...")
@@ -119,7 +126,7 @@ class GameDetectorService:
             app_id = os.environ.get('SteamAppId')
             if app_id and app_id != "0":
                 decky.logger.info(f"Found app ID from environment: {app_id}")
-                return int(app_id)
+                return {"app_id": int(app_id), "source": "environment"}
             
             # Method 2: Check overlay file
             overlay_file = Path("/dev/shm/SteamOverlayAppId")
@@ -129,7 +136,7 @@ class GameDetectorService:
                         app_id = f.read().strip()
                         if app_id and app_id != "0":
                             decky.logger.info(f"Found app ID from overlay: {app_id}")
-                            return int(app_id)
+                            return {"app_id": int(app_id), "source": "overlay"}
                 except Exception as e:
                     decky.logger.warning(f"Failed to read overlay file: {e}")
             
@@ -142,7 +149,7 @@ class GameDetectorService:
                             app_id = f.read().strip()
                             if app_id and app_id != "0":
                                 decky.logger.info(f"Found app ID from {shm_file}: {app_id}")
-                                return int(app_id)
+                                return {"app_id": int(app_id), "source": f"shm_{shm_file.split('/')[-1]}"}
                 except Exception as e:
                     decky.logger.debug(f"Could not read {shm_file}: {e}")
             
@@ -164,7 +171,7 @@ class GameDetectorService:
                                         app_id = match.group(1)
                                         if app_id != "0":
                                             decky.logger.info(f"Found app ID from process: {app_id}")
-                                            return int(app_id)
+                                            return {"app_id": int(app_id), "source": "process"}
                             except:
                                 continue
             except Exception as e:
@@ -188,13 +195,13 @@ class GameDetectorService:
                                 app_id = match.group(1)
                                 if app_id != "0":
                                     decky.logger.info(f"Found app ID from registry: {app_id}")
-                                    return int(app_id)
+                                    return {"app_id": int(app_id), "source": "registry"}
                     except Exception as e:
                         decky.logger.debug(f"Failed to read registry: {e}")
             
             decky.logger.info("No running Steam game detected")
-            return None
+            return {"error": "No running Steam game detected"}
             
         except Exception as e:
             decky.logger.error(f"Failed to get running app ID: {e}")
-            return None
+            return {"error": f"Failed to get running app ID: {str(e)}"}

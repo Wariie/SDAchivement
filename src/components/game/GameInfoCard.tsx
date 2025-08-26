@@ -24,10 +24,10 @@ export const GameInfoCard: VFC<GameInfoCardProps> = ({ game, rarestAchievement }
       {/* Game Image */}
       {game.header_image && (
         <div style={{ textAlign: "center", marginBottom: "15px" }}>
-          <img 
-            src={game.header_image} 
-            style={{ 
-              maxWidth: "100%", 
+          <img
+            src={game.header_image}
+            style={{
+              maxWidth: "100%",
               borderRadius: "8px",
               maxHeight: "200px"
             }}
@@ -38,20 +38,20 @@ export const GameInfoCard: VFC<GameInfoCardProps> = ({ game, rarestAchievement }
 
       {/* Achievement Stats */}
       <div style={{ marginBottom: "15px" }}>
-        <div style={{ 
-          display: "flex", 
-          justifyContent: "space-between", 
+        <div style={{
+          display: "flex",
+          justifyContent: "space-between",
           padding: "8px 0",
           borderBottom: "1px solid rgba(255,255,255,0.1)"
         }}>
           <span>Total Achievements:</span>
           <span style={{ fontWeight: "bold" }}>{game.achievements}</span>
         </div>
-        
+
         {game.has_achievements && (
-          <div style={{ 
-            display: "flex", 
-            justifyContent: "space-between", 
+          <div style={{
+            display: "flex",
+            justifyContent: "space-between",
             padding: "8px 0",
             borderBottom: "1px solid rgba(255,255,255,0.1)"
           }}>
@@ -67,7 +67,7 @@ export const GameInfoCard: VFC<GameInfoCardProps> = ({ game, rarestAchievement }
           <h4 style={{ margin: "0 0 8px 0", fontSize: "14px", opacity: 0.8 }}>
             Rarest Achievement
           </h4>
-          <div style={{ 
+          <div style={{
             padding: "10px",
             backgroundColor: "rgba(255,215,0,0.1)",
             borderRadius: "4px",
@@ -75,8 +75,8 @@ export const GameInfoCard: VFC<GameInfoCardProps> = ({ game, rarestAchievement }
           }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               {rarestAchievement.icon && (
-                <img 
-                  src={rarestAchievement.icon} 
+                <img
+                  src={rarestAchievement.icon}
                   style={{ width: "32px", height: "32px", borderRadius: "4px" }}
                   alt=""
                 />

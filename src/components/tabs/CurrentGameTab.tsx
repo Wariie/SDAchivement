@@ -50,7 +50,7 @@ export const CurrentGameTab: VFC<CurrentGameTabProps> = ({
   const [enhancedTrackedGame, setEnhancedTrackedGame] = useState<GameInfo | null>(null);
 
   // Determine which game and achievements to display
-  const displayGame = viewMode === "current" ? currentGame : 
+  const displayGame = viewMode === "current" ? currentGame :
     (enhancedTrackedGame || (trackedGame ? { ...trackedGame, is_running: false, has_achievements: true } as GameInfo : null));
   const displayAchievements = viewMode === "current" ? achievements : trackedGameAchievements;
 
@@ -74,7 +74,7 @@ export const CurrentGameTab: VFC<CurrentGameTabProps> = ({
     }
 
     let modalInstance: any = null;
-    
+
     modalInstance = showModal(
       <GameSelectionModal
         games={installedGames}
@@ -140,13 +140,13 @@ export const CurrentGameTab: VFC<CurrentGameTabProps> = ({
   const getSortDisplayName = (sort: SortBy, order: "asc" | "desc"): string => {
     const orderText = order === "asc" ? " (Ascending)" : " (Descending)";
     switch (sort) {
-      case "unlock": 
+      case "unlock":
         return order === "desc" ? "Recently Unlocked" : "Oldest Unlocked";
-      case "name": 
+      case "name":
         return "Name" + orderText;
-      case "rarity": 
+      case "rarity":
         return "Rarity" + orderText;
-      default: 
+      default:
         return "Recently Unlocked";
     }
   };
@@ -172,16 +172,16 @@ export const CurrentGameTab: VFC<CurrentGameTabProps> = ({
       { sort: "rarity", order: "asc" },  // Rarity (Ascending)
       { sort: "rarity", order: "desc" }  // Rarity (Descending)
     ];
-    
+
     // Find current combination
     const currentIndex = sortOptions.findIndex(
       option => option.sort === sortBy && option.order === sortOrder
     );
-    
+
     // Move to next option (or back to first if at end)
     const nextIndex = (currentIndex + 1) % sortOptions.length;
     const nextOption = sortOptions[nextIndex];
-    
+
     setSortBy(nextOption.sort);
     setSortOrder(nextOption.order);
   };
@@ -196,7 +196,7 @@ export const CurrentGameTab: VFC<CurrentGameTabProps> = ({
   return (
     <div style={{ padding: "0", margin: "0" }}>
       {/* Game Banner */}
-      <GameBanner 
+      <GameBanner
         game={displayGame}
         isLoading={isLoading}
         onRefresh={handleRefresh}
@@ -245,7 +245,7 @@ export const CurrentGameTab: VFC<CurrentGameTabProps> = ({
               </div>
             </ButtonItem>
           </PanelSectionRow>
-          
+
           {filtersExpanded && (
             <>
               <PanelSectionRow>
@@ -259,7 +259,7 @@ export const CurrentGameTab: VFC<CurrentGameTabProps> = ({
                   </div>
                 </ButtonItem>
               </PanelSectionRow>
-          
+
           <PanelSectionRow>
             <ButtonItem
               layout="below"
@@ -271,7 +271,7 @@ export const CurrentGameTab: VFC<CurrentGameTabProps> = ({
               </div>
             </ButtonItem>
           </PanelSectionRow>
-          
+
           <PanelSectionRow>
             <ToggleField
               label="Show hidden achievements"
@@ -279,7 +279,7 @@ export const CurrentGameTab: VFC<CurrentGameTabProps> = ({
               onChange={setShowHidden}
             />
           </PanelSectionRow>
-          
+
           <PanelSectionRow>
             <ToggleField
               label="Unlocked only"
@@ -290,7 +290,7 @@ export const CurrentGameTab: VFC<CurrentGameTabProps> = ({
               }}
             />
           </PanelSectionRow>
-          
+
           <PanelSectionRow>
             <ToggleField
               label="Locked only"
@@ -301,7 +301,7 @@ export const CurrentGameTab: VFC<CurrentGameTabProps> = ({
               }}
             />
           </PanelSectionRow>
-          
+
           <PanelSectionRow>
             <ButtonItem
               layout="below"
@@ -309,11 +309,11 @@ export const CurrentGameTab: VFC<CurrentGameTabProps> = ({
               disabled={isLoading}
             >
               <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px" }}>
-                <FaSync 
-                  style={{ 
+                <FaSync
+                  style={{
                     fontSize: "12px",
                     animation: isLoading ? "spin 1s linear infinite" : "none"
-                  }} 
+                  }}
                 />
                 Refresh
               </div>
@@ -341,7 +341,7 @@ export const CurrentGameTab: VFC<CurrentGameTabProps> = ({
           </div>
         </PanelSection>
       )}
-      
+
       {/* Error message */}
       {displayAchievements?.error && (
         <PanelSection>
@@ -352,7 +352,7 @@ export const CurrentGameTab: VFC<CurrentGameTabProps> = ({
           </PanelSectionRow>
         </PanelSection>
       )}
-      
+
       {/* Loading indicator */}
       {isLoading && loadingMessage && loadingMessage.trim() && (
         <PanelSection>
@@ -361,7 +361,7 @@ export const CurrentGameTab: VFC<CurrentGameTabProps> = ({
           </PanelSectionRow>
         </PanelSection>
       )}
-      
+
     </div>
   );
 };

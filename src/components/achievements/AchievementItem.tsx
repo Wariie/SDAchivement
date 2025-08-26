@@ -9,9 +9,9 @@ interface AchievementItemExtendedProps extends AchievementItemProps {
   onClick?: () => void;
 }
 
-export const AchievementItem: VFC<AchievementItemExtendedProps> = ({ 
-  achievement, 
-  onClick 
+export const AchievementItem: VFC<AchievementItemExtendedProps> = ({
+  achievement,
+  onClick
 }) => {
   return (
     <PanelSectionRow>
@@ -19,24 +19,24 @@ export const AchievementItem: VFC<AchievementItemExtendedProps> = ({
         layout="below"
         onClick={onClick}
       >
-        <div style={{ 
-          display: "flex", 
-          alignItems: "center", 
+        <div style={{
+          display: "flex",
+          alignItems: "center",
           gap: "12px",
           opacity: achievement.unlocked ? 1 : 0.6
         }}>
           {/* Achievement Icon */}
           {achievement.icon && (
-            <img 
-              src={achievement.unlocked ? achievement.icon : achievement.icon_gray} 
+            <img
+              src={achievement.unlocked ? achievement.icon : achievement.icon_gray}
               style={{ width: "32px", height: "32px", borderRadius: "4px" }}
               alt=""
             />
           )}
-          
+
           {/* Achievement Info */}
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ 
+            <div style={{
               fontWeight: achievement.unlocked ? "bold" : "normal",
               fontSize: "14px",
               display: "flex",
@@ -47,22 +47,22 @@ export const AchievementItem: VFC<AchievementItemExtendedProps> = ({
               {achievement.unlocked && <FaCheck style={{ color: "#4CAF50", fontSize: "12px" }} />}
               {achievement.hidden && !achievement.unlocked && <FaLock style={{ fontSize: "12px", opacity: 0.5 }} />}
             </div>
-            <div style={{ 
-              fontSize: "12px", 
+            <div style={{
+              fontSize: "12px",
               opacity: 0.7,
               marginTop: "2px"
             }}>
-              {!achievement.hidden || achievement.unlocked 
-                ? achievement.description 
+              {!achievement.hidden || achievement.unlocked
+                ? achievement.description
                 : "Hidden achievement"}
             </div>
           </div>
-          
+
           {/* Rarity indicator */}
           {achievement.global_percent !== null && achievement.global_percent <= 10 && (
-            <div style={{ 
-              display: "flex", 
-              flexDirection: "column", 
+            <div style={{
+              display: "flex",
+              flexDirection: "column",
               alignItems: "center",
               minWidth: "40px"
             }}>

@@ -1,9 +1,9 @@
 // components/tabs/RecentTab.tsx
 import { VFC } from "react";
-import { 
-  PanelSection, 
-  PanelSectionRow, 
-  ButtonItem, 
+import {
+  PanelSection,
+  PanelSectionRow,
+  ButtonItem,
   Focusable,
   showModal
 } from "@decky/ui";
@@ -59,17 +59,17 @@ export const RecentTab: VFC<RecentTabProps> = ({
           disabled={isLoading}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px" }}>
-            <FaSync 
-              style={{ 
+            <FaSync
+              style={{
                 fontSize: "12px",
                 animation: isLoading ? "spin 1s linear infinite" : "none"
-              }} 
+              }}
             />
             Refresh Recent
           </div>
         </ButtonItem>
       </PanelSectionRow>
-      
+
       {recentAchievements.length > 0 ? (
         <div style={{ maxHeight: "400px", overflowY: "auto", overflowX: "hidden" }}>
           <Focusable style={{ display: "flex", flexDirection: "column", gap: 0 }}>
@@ -81,8 +81,8 @@ export const RecentTab: VFC<RecentTabProps> = ({
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "4px 0" }}>
                     {ach.icon && (
-                      <img 
-                        src={ach.icon} 
+                      <img
+                        src={ach.icon}
                         style={{ width: "28px", height: "28px", borderRadius: "4px" }}
                         alt=""
                       />
@@ -99,9 +99,9 @@ export const RecentTab: VFC<RecentTabProps> = ({
                       </div>
                     </div>
                     {ach.global_percent !== null && !isNaN(ach.global_percent) && ach.global_percent <= 10 && (
-                      <div style={{ 
-                        display: "flex", 
-                        flexDirection: "column", 
+                      <div style={{
+                        display: "flex",
+                        flexDirection: "column",
                         alignItems: "center",
                         minWidth: "35px"
                       }}>
@@ -131,5 +131,5 @@ export const RecentTab: VFC<RecentTabProps> = ({
     </PanelSection>
   );
 
-  
+
 };

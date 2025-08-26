@@ -11,7 +11,6 @@ from services.game_detector import GameDetectorService
 from services.achievement import AchievementService
 from services.cache import CacheService
 from services.steam_scanner import SteamScannerService
-from utils.debug import DebugUtils
 from steam_api import SteamAPI
 
 
@@ -32,8 +31,7 @@ class Plugin:
         self.game_detector = GameDetectorService()
         self.cache_service = CacheService(self.cache_dir)
         self.steam_scanner = SteamScannerService()
-        self.debug_utils = DebugUtils()
-        
+
         # These will be initialized after settings are loaded
         self.achievement_service = None
         self.api: Optional[SteamAPI] = None
@@ -62,12 +60,14 @@ class Plugin:
             
             # Get current user if not set
             if not self.current_user_id:
-                detected_user = await self.game_detector.get_current_steam_user()
-                if detected_user:
-                    decky.logger.info(f"Auto-detected Steam user: {detected_user}")
+                user_result = await self.game_detector.get_current_steam_user()
+                if user_result and not user_result.get("error"):
+                    detected_user = user_result["user_id"]
+                    decky.logger.info(f"Auto-detected Steam user: {detected_user} (source: {user_result.get('source', 'unknown')})")
                     await self.set_steam_user_id(detected_user)
                 else:
-                    decky.logger.warning("No Steam user ID detected - plugin will need manual configuration")
+                    error_msg = user_result.get("error", "Unknown error") if user_result else "No response"
+                    decky.logger.warning(f"No Steam user ID detected: {error_msg} - plugin will need manual configuration")
 
             # Initialize API and achievement service
             if self.steam_api_key and self.current_user_id:
@@ -212,19 +212,6 @@ class Plugin:
         except Exception as e:
             decky.logger.error(f"Failed to set API key: {e}")
             return False
-    
-    async def set_steam_user_id(self, user_id: str) -> bool:
-        """Set Steam user ID"""
-        try:
-            success = await self.settings_service.set_user_id(user_id)
-            if success:
-                self.current_user_id = user_id
-                await self._reinitialize_api()
-                decky.logger.info("User ID set and services reinitialized")
-            return success
-        except Exception as e:
-            decky.logger.error(f"Failed to set user ID: {e}")
-            return False
         
     async def set_tracked_game(self, app_id: int, name: str) -> bool:
         """Set tracked game"""
@@ -291,14 +278,9 @@ class Plugin:
     
     async def get_current_game(self) -> Optional[Dict]:
         """Get currently running game"""
-        return await self.game_detector.get_current_game(self.test_app_id, self.api)
-    
-    async def get_current_steam_user(self) -> Optional[str]:
-        """Get current Steam user ID"""
-        user_id = await self.game_detector.get_current_steam_user()
-        if user_id and not self.current_user_id:
-            await self.set_steam_user_id(user_id)
-        return user_id
+        result = await self.game_detector.get_current_game(self.test_app_id, self.api)
+        # Return None if there's an error to maintain compatibility with existing code
+        return result if result and not result.get("error") else None
     
     async def get_game_info(self, app_id: int) -> Dict:
         """Get game information"""
@@ -369,7 +351,9 @@ class Plugin:
                 return []
                 
             response = await self.api.get_recently_played_games()
-            if not response or "response" not in response or "games" not in response["response"]:
+            if not response or response.get("error") or "response" not in response or "games" not in response["response"]:
+                if response and response.get("error"):
+                    decky.logger.error(f"Failed to get recently played games: {response['error']}")
                 return []
                 
             games = response["response"]["games"][:count]
@@ -389,7 +373,7 @@ class Plugin:
                 # Get header image from app details
                 try:
                     app_details = await self.api.get_app_details(game["appid"])
-                    if app_details:
+                    if app_details and not app_details.get("error"):
                         enhanced_game["header_image"] = app_details.get("header_image", "")
                         enhanced_game["has_achievements"] = app_details.get("has_achievements", False)
                         enhanced_game["achievement_count"] = app_details.get("achievement_count", 0)
@@ -443,21 +427,9 @@ class Plugin:
         """Invalidate progress cache"""
         return await self.cache_service.invalidate_progress_cache()
     
-    # ==================== Debug Functions ====================
-    
-    # async def get_log_content(self, lines: int = 100) -> str:
-    #     """Get log content"""
-    #     return await self.debug_utils.get_log_content(lines)
-    
-    # async def get_debug_info(self) -> Dict:
-    #     """Get debug information"""
-    #     debug_info = await self.debug_utils.get_debug_info()
-    #     debug_info.update({
-    #         "api_key_set": bool(self.steam_api_key),
-    #         "user_id": self.current_user_id,
-    #         "test_app_id": self.test_app_id
-    #     })
-    #     return debug_info
+    async def is_desktop_mode(self) -> bool:
+        """Check if currently in Gaming Mode"""
+        return self.steam_scanner.check_is_desktop_mode()
     
     # ==================== Private Methods ====================
     

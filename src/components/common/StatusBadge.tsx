@@ -16,7 +16,7 @@ const badgeColors = {
 
 export const StatusBadge: React.VFC<StatusBadgeProps> = ({ type, children, style }) => {
   const colors = badgeColors[type];
-  
+
   return (
     <span style={{
       backgroundColor: colors.bg,

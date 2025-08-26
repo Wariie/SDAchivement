@@ -29,3 +29,4 @@ export const getInstalledGames = callable<[], GameInfo[]>("get_installed_games")
 export const getGameArtwork = callable<[app_id: number], Record<string, string | null>>("get_game_artwork");
 export const getGameInfo = callable<[app_id: number], GameInfo>("get_game_info");
 export const getRecentlyPlayedGames = callable<[count: number], GameInfo[]>("get_recently_played_games");
+export const isDesktopMode = callable<[], boolean>("is_desktop_mode");

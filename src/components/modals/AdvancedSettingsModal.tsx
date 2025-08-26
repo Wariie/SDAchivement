@@ -1,8 +1,8 @@
 // components/modals/AdvancedSettingsModal.tsx
 import { VFC, useState, useEffect } from "react";
-import { 
-  ModalRoot, 
-  TextField, 
+import {
+  ModalRoot,
+  TextField,
   ButtonItem,
   PanelSection,
   PanelSectionRow
@@ -16,11 +16,11 @@ interface AdvancedSettingsModalProps {
   closeModal?: () => void;
 }
 
-export const AdvancedSettingsModal: VFC<AdvancedSettingsModalProps> = ({ 
+export const AdvancedSettingsModal: VFC<AdvancedSettingsModalProps> = ({
   currentTestGameId,
   onSaveTestGame,
   onClearTestGame,
-  closeModal 
+  closeModal
 }) => {
   const [testGameId, setTestGameId] = useState(currentTestGameId);
   const [isSaving, setIsSaving] = useState(false);
@@ -70,23 +70,23 @@ export const AdvancedSettingsModal: VFC<AdvancedSettingsModalProps> = ({
 
   return (
     <ModalRoot onCancel={closeModal}>
-      <div style={{ 
-        padding: "20px", 
-        minWidth: "450px", 
-        maxWidth: "550px" 
+      <div style={{
+        padding: "20px",
+        minWidth: "450px",
+        maxWidth: "550px"
       }}>
         <PanelSection title="">
-          <div style={{ 
-            textAlign: "center", 
-            marginBottom: "20px" 
+          <div style={{
+            textAlign: "center",
+            marginBottom: "20px"
           }}>
             <FaCog style={{ fontSize: "32px", color: "#4a9eff", marginBottom: "10px" }} />
             <h2 style={{ margin: "0 0 10px 0", fontSize: "18px" }}>
               Testing Options
             </h2>
-            <p style={{ 
-              margin: "0", 
-              fontSize: "14px", 
+            <p style={{
+              margin: "0",
+              fontSize: "14px",
               opacity: 0.8,
               lineHeight: "1.4"
             }}>
@@ -98,9 +98,9 @@ export const AdvancedSettingsModal: VFC<AdvancedSettingsModalProps> = ({
         {/* Test Game Section */}
         <PanelSection title="🎮 Test Game">
           <PanelSectionRow>
-            <div style={{ 
-              fontSize: "13px", 
-              opacity: 0.8, 
+            <div style={{
+              fontSize: "13px",
+              opacity: 0.8,
               marginBottom: "10px",
               lineHeight: "1.4"
             }}>
@@ -119,7 +119,7 @@ export const AdvancedSettingsModal: VFC<AdvancedSettingsModalProps> = ({
           </PanelSectionRow>
 
           <PanelSectionRow>
-            <div style={{ 
+            <div style={{
               backgroundColor: "rgba(255, 255, 255, 0.05)",
               padding: "10px",
               borderRadius: "6px",
@@ -128,16 +128,16 @@ export const AdvancedSettingsModal: VFC<AdvancedSettingsModalProps> = ({
               <div style={{ marginBottom: "8px", fontWeight: "bold" }}>
                 Popular Game IDs:
               </div>
-              <div style={{ 
-                display: "grid", 
-                gridTemplateColumns: "1fr 1fr", 
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
                 gap: "4px",
                 opacity: 0.9
               }}>
                 {getGameExamples().map(game => (
-                  <div 
+                  <div
                     key={game.id}
-                    style={{ 
+                    style={{
                       cursor: "pointer",
                       padding: "2px 4px",
                       borderRadius: "3px",
@@ -163,7 +163,7 @@ export const AdvancedSettingsModal: VFC<AdvancedSettingsModalProps> = ({
                 <FaGamepad style={{ marginRight: "6px" }} />
                 Set Test Game
               </ButtonItem>
-              
+
               {testGameId && (
                 <ButtonItem
                   onClick={handleClearTestGame}
@@ -176,10 +176,10 @@ export const AdvancedSettingsModal: VFC<AdvancedSettingsModalProps> = ({
           </PanelSectionRow>
         </PanelSection>
 
-        <div style={{ 
-          display: "flex", 
-          justifyContent: "flex-end", 
-          marginTop: "20px" 
+        <div style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          marginTop: "20px"
         }}>
           <ButtonItem onClick={closeModal}>
             Close

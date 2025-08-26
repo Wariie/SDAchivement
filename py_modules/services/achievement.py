@@ -97,8 +97,8 @@ class AchievementService:
             
             # Get owned games
             owned_games = await self.api.get_owned_games()
-            if not owned_games:
-                decky.logger.error("Failed to get owned games")
+            if not owned_games or owned_games.get("error"):
+                decky.logger.error(f"Failed to get owned games: {owned_games.get('error', 'Unknown error') if owned_games else 'No response'}")
                 return []
             
             games = owned_games.get("response", {}).get("games", [])
@@ -140,7 +140,7 @@ class AchievementService:
                 if cached_data:
                     # Validate game count hasn't changed significantly
                     owned_games = await self.api.get_owned_games()
-                    if owned_games:
+                    if owned_games and not owned_games.get("error"):
                         current_count = len(owned_games.get("response", {}).get("games", []))
                         cached_count = cached_data.get("total_games", 0)
                         
@@ -152,11 +152,11 @@ class AchievementService:
             
             # Get owned games
             owned_games = await self.api.get_owned_games()
-            if not owned_games:
-                return {"error": "Failed to get owned games"}
+            if not owned_games or owned_games.get("error"):
+                error_msg = owned_games.get("error", "Unknown error") if owned_games else "No response from API"
+                return {"error": f"Failed to get owned games: {error_msg}"}
             
             games = owned_games.get("response", {}).get("games", [])
-            decky.logger.info(f"Found {len(games)} owned games")
             
             total_achievements = 0
             unlocked_achievements = 0
@@ -201,10 +201,10 @@ class AchievementService:
             
             # Process games in batches to avoid overwhelming the API
             total_batches = (len(games) + batch_size - 1) // batch_size
+            decky.logger.info(f"Processing {len(games)} games in {total_batches} batches")
+            
             for i in range(0, len(games), batch_size):
                 batch = games[i:i + batch_size]
-                batch_num = i // batch_size + 1
-                decky.logger.info(f"Processing batch {batch_num}/{total_batches}: {len(batch)} games")
                 
                 # Process batch concurrently
                 tasks = [process_game(game) for game in batch]
