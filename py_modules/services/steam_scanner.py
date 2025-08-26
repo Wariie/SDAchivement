@@ -2,7 +2,9 @@
 Steam installation scanner service
 Scans local Steam installation to find installed games
 """
+import os
 import re
+import subprocess
 import decky
 from pathlib import Path
 from typing import List, Dict, Optional
@@ -199,3 +201,18 @@ class SteamScannerService:
                     artwork[key] = fallback
         
         return artwork
+    
+    def check_is_desktop_mode(self) -> bool:
+        """Quick and lightweight mode detection"""
+        try:
+            # Single command to check if kwin_x11 is running
+            result = subprocess.run(['pgrep', '-x', 'kwin_x11'], 
+                                  capture_output=True, 
+                                  timeout=3)
+            
+            is_desktop = result.returncode == 0
+            #is_desktop = result.stdout != ""
+            
+            return is_desktop
+        except (subprocess.TimeoutExpired, FileNotFoundError, Exception) as e:
+            return False

@@ -8,6 +8,7 @@ import {
   PanelSectionRow
 } from "@decky/ui";
 import { FaKey, FaExternalLinkAlt, FaCheck, FaTimes, FaClipboard } from "react-icons/fa";
+import { isDesktopMode } from "../../services/api";
 
 interface ApiKeyModalProps {
   currentApiKey: string;
@@ -23,7 +24,7 @@ export const ApiKeyModal: VFC<ApiKeyModalProps> = ({
   const [apiKey, setApiKey] = useState(currentApiKey);
   const [isSaving, setIsSaving] = useState(false);
   const [validationMessage, setValidationMessage] = useState("");
-  const [isGamingMode, setIsGamingMode] = useState(false);
+  const [isDesktopModeV, setIsDesktopMode] = useState(false);
 
   useEffect(() => {
     setApiKey(currentApiKey);
@@ -50,19 +51,19 @@ export const ApiKeyModal: VFC<ApiKeyModalProps> = ({
 
   // Add this useEffect to detect Gaming Mode:
   useEffect(() => {
-    const checkGamingMode = () => {
-      SteamClient.UI.GetUIMode()
-        .then(mode => {
-          console.log("Current UI Mode:", mode);
-          setIsGamingMode(mode === 4)
+    const checkDesktopMode = () => {
+      isDesktopMode()
+        .then(v => {
+          console.log("Current UI Mode:", v);
+          setIsDesktopMode(v)
         })
         .catch(err => {
           console.error("Failed to get UI mode:", err);
-          setIsGamingMode(true);
-        })// Default to false on error
+          setIsDesktopMode(false);
+        })// Default to false on error  
     };
 
-    checkGamingMode();
+    checkDesktopMode();
   }, []);
 
   const handleSave = async () => {
@@ -144,7 +145,35 @@ export const ApiKeyModal: VFC<ApiKeyModalProps> = ({
             </div>
           </PanelSectionRow>
 
-          {isGamingMode ? (
+          {isDesktopModeV ? (
+            <PanelSectionRow>
+              <div style={{
+                backgroundColor: "rgba(76, 175, 80, 0.1)",
+                padding: "12px",
+                borderRadius: "8px",
+                marginBottom: "15px",
+                border: "1px solid rgba(76, 175, 80, 0.3)"
+              }}>
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  marginBottom: "8px"
+                }}>
+                  <FaClipboard style={{ fontSize: "12px", color: "#4CAF50" }} />
+                  <strong style={{ fontSize: "13px", color: "#4CAF50" }}>Desktop Mode Tip</strong>
+                </div>
+                <p style={{
+                  margin: "0",
+                  fontSize: "12px",
+                  opacity: 0.9,
+                  lineHeight: "1.3"
+                }}>
+                  Copy your API key, then click in the text field below and use the paste button on the virtual keyboard.
+                </p>
+              </div>
+            </PanelSectionRow>
+          ) : (
             <PanelSectionRow>
               <div style={{
                 backgroundColor: "rgba(255, 193, 7, 0.1)",
@@ -173,34 +202,6 @@ export const ApiKeyModal: VFC<ApiKeyModalProps> = ({
                 </p>
               </div>
             </PanelSectionRow>
-          ) : (
-            <PanelSectionRow>
-              <div style={{
-                backgroundColor: "rgba(76, 175, 80, 0.1)",
-                padding: "12px",
-                borderRadius: "8px",
-                marginBottom: "15px",
-                border: "1px solid rgba(76, 175, 80, 0.3)"
-              }}>
-                <div style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  marginBottom: "8px"
-                }}>
-                  <FaClipboard style={{ fontSize: "12px", color: "#4CAF50" }} />
-                  <strong style={{ fontSize: "13px", color: "#4CAF50" }}>Desktop Mode Tip</strong>
-                </div>
-                <p style={{
-                  margin: "0",
-                  fontSize: "12px",
-                  opacity: 0.9,
-                  lineHeight: "1.3"
-                }}>
-                  Copy your API key, then click in the text field below and use the paste button on the virtual keyboard.
-                </p>
-              </div>
-            </PanelSectionRow>
           )}
 
           <PanelSectionRow>
@@ -210,7 +211,7 @@ export const ApiKeyModal: VFC<ApiKeyModalProps> = ({
               onChange={(e: any) => handleApiKeyChange(e.target.value)}
               disabled={isSaving}
               description="32-character hexadecimal key"
-              focusOnMount={true}
+              // focusOnMount={true}
             />
           </PanelSectionRow>
 

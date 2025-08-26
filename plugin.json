@@ -4,7 +4,7 @@
   "flags": ["debug"],
   "api_version": 1,
   "publish": {
-    "tags": ["achievements", "progress", "steam", "tracker"],
+    "tags": ["achievements", "progress", "steam", "tracker", "root"],
     "description": "Decky plugin to track game progess and achievement ",
     "image": "https://https://opengraph.githubassets.com/1/Wariie/SDAchivement"
   }
