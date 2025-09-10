@@ -230,6 +230,16 @@ const Content: VFC = () => {
 
   // Tab change handler
   const handleTabChange = (tab: Tab) => {
+    // Redirect to settings if trying to access API-required tabs without API key
+    if ((tab === Tab.RECENT || tab === Tab.OVERALL) && !settings.apiKeySet) {
+      setCurrentTab(Tab.SETTINGS);
+      localStorage.setItem('sdachievement-current-tab', Tab.SETTINGS);
+      if (!settings.settingsLoaded) {
+        settings.loadPluginSettings();
+      }
+      return;
+    }
+
     setCurrentTab(tab);
     // Save to localStorage
     localStorage.setItem('sdachievement-current-tab', tab);
@@ -396,6 +406,7 @@ const Content: VFC = () => {
         <TabNavigation
           currentTab={currentTab}
           onTabChange={handleTabChange}
+          apiKeySet={settings.apiKeySet}
         />
         <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
           {renderTabContent()}

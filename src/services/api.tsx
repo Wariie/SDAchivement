@@ -27,6 +27,7 @@ export const saveAutoRefreshBackend = callable<[enabled: boolean], boolean>("set
 export const setTrackedGame = callable<[app_id: number, name: string], boolean>("set_tracked_game");
 export const clearTrackedGame = callable<[], boolean>("clear_tracked_game");
 export const setSteamApiKey = callable<[api_key: string], boolean>("set_steam_api_key");
+export const setSteamUserId = callable<[user_id: string], boolean>("set_steam_user_id");
 export const setTestGame = callable<[app_id: number], boolean>("set_test_game");
 
 export const isDesktopMode = callable<[], boolean>("is_desktop_mode");

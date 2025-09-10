@@ -116,6 +116,7 @@ export interface GameBannerProps {
 export interface TabNavigationProps {
   currentTab: Tab;
   onTabChange: (tab: Tab) => void;
+  apiKeySet: boolean;
 }
 
 export interface ProgressDisplayProps {

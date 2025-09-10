@@ -212,6 +212,19 @@ class Plugin:
         except Exception as e:
             decky.logger.error(f"Failed to set API key: {e}")
             return False
+
+    async def set_steam_user_id(self, user_id: str) -> bool:
+        """Set Steam user ID"""
+        try:
+            success = await self.settings_service.set_user_id(user_id)
+            if success:
+                self.current_user_id = user_id
+                await self._reinitialize_api()
+                decky.logger.info("Steam user ID set and services reinitialized")
+            return success
+        except Exception as e:
+            decky.logger.error(f"Failed to set user ID: {e}")
+            return False
     
     async def set_tracked_game(self, app_id: int, name: str) -> bool:
         """Set tracked game"""
@@ -284,7 +297,7 @@ class Plugin:
     
     async def get_installed_games(self) -> List[Dict]:
         """Get locally installed Steam games by scanning installation files"""
-        return await self.steam_scanner.get_installed_games()
+        return await self.steam_scanner.get_installed_games(self.current_user_id)
     
     async def get_user_games(self) -> List[Dict]:
         """Get user's full Steam library (requires Steam API key)"""

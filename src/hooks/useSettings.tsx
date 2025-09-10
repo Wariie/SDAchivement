@@ -4,6 +4,7 @@ import { toaster } from "@decky/api";
 import {
   loadSettings,
   setSteamApiKey,
+  setSteamUserId,
   setTestGame,
   clearTestGame,
   reloadSettings,
@@ -13,6 +14,7 @@ import {
 } from "../services/api";
 import { TrackedGame } from "../models";
 import { logger } from "../utils/logger";
+import { getSteamUser } from "../utils/steam_client";
 
 export interface UseSettingsReturn {
   // State
@@ -68,6 +70,24 @@ export const useSettings = (): UseSettingsReturn => {
 
         // Always set tracked game (including null/undefined to clear it)
         setTrackedGame(result.tracked_game || null);
+        
+        // Auto-detect Steam user ID if not set
+        if (!result.steam_user_id) {
+          try {
+            const currentUser = await getSteamUser();
+            if (currentUser && currentUser.strSteamID) {
+              logger.info("Auto-detected Steam user ID:", currentUser.strSteamID);
+              const success = await setSteamUserId(currentUser.strSteamID);
+              if (success) {
+                setSteamUserIdState(currentUser.strSteamID);
+                logger.info("Steam user ID automatically configured");
+              }
+            }
+          } catch (userError) {
+            logger.warn("Failed to auto-detect Steam user ID:", userError);
+          }
+        }
+        
         setSettingsLoaded(true);
       }
     } catch (error) {

@@ -132,26 +132,7 @@ class SteamScannerService:
             self.localconfig_parser = LocalConfigParser(user_id)
             decky.logger.info(f"SteamScanner: Initialized LocalConfigParser for user {user_id}")
     
-    def _get_steam_user_from_config(self) -> Optional[str]:
-        """Get Steam user ID from loginusers.vdf"""
-        try:
-            steam_path = self.get_steam_path()
-            if not steam_path:
-                return None
-            
-            loginusers_path = steam_path / "config" / "loginusers.vdf"
-            if not loginusers_path.exists():
-                return None
-            
-            with open(loginusers_path, 'r', encoding='utf-8', errors='ignore') as f:
-                content = f.read()
-                import re
-                matches = re.findall(r'"(7656\d{13})"', content)
-                if matches:
-                    return matches[0]
-        except Exception as e:
-            decky.logger.warning(f"Failed to get Steam user from config: {e}")
-        return None
+    # Note: Steam user ID detection moved to frontend using SteamClient API
     
     def parse_acf_content(self, content: str) -> Optional[Dict]:
         """Parse ACF file content to extract game info"""
@@ -251,7 +232,7 @@ class SteamScannerService:
         except Exception:
             return "Unknown"
     
-    async def get_installed_games(self) -> List[Dict]:
+    async def get_installed_games(self, user_id: Optional[str] = None) -> List[Dict]:
         """Get all installed Steam games by scanning ACF files"""
         try:
             decky.logger.info("Starting Steam installed games scan...")
@@ -260,10 +241,11 @@ class SteamScannerService:
             if not steam_path:
                 return []
             
-            # Initialize LocalConfigParser if possible
-            user_id = self._get_steam_user_from_config()
+            # Initialize LocalConfigParser if user_id is provided
             if user_id:
                 self._initialize_localconfig_parser(user_id)
+            else:
+                decky.logger.info("No user_id provided - scanning games without enhanced data from localconfig")
             
             library_folders = self.get_library_folders(steam_path)
             if not library_folders:

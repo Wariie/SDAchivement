@@ -4,7 +4,7 @@ import { PanelSection, DialogButton, Focusable } from "@decky/ui";
 import { FaGamepad, FaClock, FaChartLine, FaKey } from "../../utils/icons";
 import { Tab, TabNavigationProps } from "../../models";
 
-export const TabNavigation: VFC<TabNavigationProps> = ({ currentTab, onTabChange }) => {
+export const TabNavigation: VFC<TabNavigationProps> = ({ currentTab, onTabChange, apiKeySet }) => {
   return (
     <PanelSection>
       <Focusable style={{ display: "flex", gap: "2px" }}>
@@ -25,9 +25,11 @@ export const TabNavigation: VFC<TabNavigationProps> = ({ currentTab, onTabChange
             flex: 1,
             padding: "8px",
             minWidth: "40px",
-            backgroundColor: currentTab === Tab.RECENT ? "rgba(255,255,255,0.1)" : "transparent"
+            backgroundColor: currentTab === Tab.RECENT ? "rgba(255,255,255,0.1)" : "transparent",
+            opacity: apiKeySet ? 1 : 0.4
           }}
-          onClick={() => onTabChange(Tab.RECENT)}
+          onClick={() => apiKeySet && onTabChange(Tab.RECENT)}
+          disabled={!apiKeySet}
         >
           <FaClock size={16} />
         </DialogButton>
@@ -37,9 +39,11 @@ export const TabNavigation: VFC<TabNavigationProps> = ({ currentTab, onTabChange
             flex: 1,
             padding: "8px",
             minWidth: "40px",
-            backgroundColor: currentTab === Tab.OVERALL ? "rgba(255,255,255,0.1)" : "transparent"
+            backgroundColor: currentTab === Tab.OVERALL ? "rgba(255,255,255,0.1)" : "transparent",
+            opacity: apiKeySet ? 1 : 0.4
           }}
-          onClick={() => onTabChange(Tab.OVERALL)}
+          onClick={() => apiKeySet && onTabChange(Tab.OVERALL)}
+          disabled={!apiKeySet}
         >
           <FaChartLine size={16} />
         </DialogButton>

@@ -90,6 +90,22 @@ class SettingsService:
         except Exception as e:
             decky.logger.error(f"Failed to set API key: {e}")
             return False
+
+    async def set_user_id(self, user_id: str) -> bool:
+        """Set Steam user ID"""
+        try:
+            decky.logger.info(f"Setting Steam user ID: {user_id}")
+            
+            # Ensure settings is initialized
+            if not hasattr(self, 'settings') or self.settings is None:
+                self.settings = {}
+            
+            settings = self.settings.copy()
+            settings['steam_user_id'] = user_id
+            return await self.save(settings)
+        except Exception as e:
+            decky.logger.error(f"Failed to set user ID: {e}")
+            return False
     
     
     async def set_test_game(self, app_id: int) -> bool:
