@@ -12,6 +12,7 @@ import {
   refreshCache
 } from "../services/api";
 import { TrackedGame } from "../models";
+import { logger } from "../utils/logger";
 
 export interface UseSettingsReturn {
   // State
@@ -41,8 +42,8 @@ export interface UseSettingsReturn {
 export const useSettings = (): UseSettingsReturn => {
   const [apiKeySet, setApiKeySet] = useState(false);
   const [steamUserId, setSteamUserIdState] = useState("");
-  const [autoRefresh, setAutoRefresh] = useState(true);
-  const [refreshInterval, setRefreshInterval] = useState(30);
+  const [autoRefresh, setAutoRefresh] = useState(false); // Default to disabled to reduce CPU usage
+  const [refreshInterval, setRefreshInterval] = useState(60); // Default to 1 minute to reduce CPU usage
   const [testGameId, setTestGameId] = useState("");
   const [steamApiKey, setSteamApiKeyState] = useState("");
   const [trackedGame, setTrackedGame] = useState<TrackedGame | null>(null);
@@ -56,9 +57,9 @@ export const useSettings = (): UseSettingsReturn => {
       if (result) {
         setApiKeySet(!!result.steam_api_key);
         setSteamUserIdState(result.steam_user_id || "");
-        setAutoRefresh(result.auto_refresh ?? true);
-        setRefreshInterval(result.refresh_interval ?? 30);
-        lastSavedInterval.current = result.refresh_interval ?? 30;
+        setAutoRefresh(result.auto_refresh ?? false);
+        setRefreshInterval(result.refresh_interval ?? 60);
+        lastSavedInterval.current = result.refresh_interval ?? 60;
         if (result.test_app_id) {
           setTestGameId(result.test_app_id.toString());
         } else {
@@ -70,7 +71,7 @@ export const useSettings = (): UseSettingsReturn => {
         setSettingsLoaded(true);
       }
     } catch (error) {
-      console.error("Failed to load settings:", error);
+      logger.error("Failed to load settings:", error);
     }
   }, []);
 
@@ -88,7 +89,7 @@ export const useSettings = (): UseSettingsReturn => {
         try {
           await refreshCache();
         } catch (cacheError) {
-          console.warn("Failed to clear cache after API key change:", cacheError);
+          logger.warn("Failed to clear cache after API key change", cacheError);
           // Don't fail the whole operation if cache clear fails
         }
 
@@ -110,7 +111,7 @@ export const useSettings = (): UseSettingsReturn => {
         return false;
       }
     } catch (error) {
-      console.error("Failed to save API key:", error);
+      logger.error("Failed to save API key:", error);
       toaster.toast({
         title: "Error",
         body: "Failed to save API key",
@@ -142,7 +143,7 @@ export const useSettings = (): UseSettingsReturn => {
       }
       return false;
     } catch (error) {
-      console.error("Failed to set test game:", error);
+      logger.error("Failed to set test game:", error);
       toaster.toast({
         title: "Error",
         body: "Failed to set test game",
@@ -171,7 +172,7 @@ export const useSettings = (): UseSettingsReturn => {
         return false;
       }
     } catch (error) {
-      console.error("Failed to clear test game:", error);
+      logger.error("Failed to clear test game:", error);
       toaster.toast({
         title: "Error",
         body: "Failed to clear test game",
@@ -196,7 +197,7 @@ export const useSettings = (): UseSettingsReturn => {
       } catch (backendError) {
       }
     } catch (error) {
-      console.error("Failed to save auto-refresh setting:", error);
+      logger.error("Failed to save auto-refresh setting:", error);
     }
   }, []);
 
@@ -221,7 +222,7 @@ export const useSettings = (): UseSettingsReturn => {
       } catch (backendError) {
       }
     } catch (error) {
-      console.error("Failed to save refresh interval:", error);
+      logger.error("Failed to save refresh interval:", error);
     }
   }, []);
 
@@ -231,9 +232,9 @@ export const useSettings = (): UseSettingsReturn => {
       if (reloaded && !reloaded.error) {
         setApiKeySet(!!reloaded.api_key_set);
         setSteamUserIdState(reloaded.steam_user_id || "");
-        setAutoRefresh(reloaded.auto_refresh ?? true);
-        setRefreshInterval(reloaded.refresh_interval ?? 30);
-        lastSavedInterval.current = reloaded.refresh_interval ?? 30;
+        setAutoRefresh(reloaded.auto_refresh ?? false);
+        setRefreshInterval(reloaded.refresh_interval ?? 60);
+        lastSavedInterval.current = reloaded.refresh_interval ?? 60;
         if (reloaded.test_app_id) {
           setTestGameId(reloaded.test_app_id.toString());
         } else {
@@ -255,7 +256,7 @@ export const useSettings = (): UseSettingsReturn => {
         });
       }
     } catch (error) {
-      console.error("Failed to reload settings:", error);
+      logger.error("Failed to reload settings:", error);
       toaster.toast({
         title: "Error",
         body: "Failed to reload settings",

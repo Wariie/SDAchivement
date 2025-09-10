@@ -1,11 +1,11 @@
 from .settings import SettingsService
 from .game_detector import GameDetectorService
 from .achievement import AchievementService
-from .cache import CacheService
+from .cache import FileCacheService
 
 __all__ = [
     'SettingsService',
     'GameDetectorService', 
     'AchievementService',
-    'CacheService'
+    'FileCacheService'
 ]

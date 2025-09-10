@@ -17,9 +17,14 @@ export {
   FaClipboard,
   FaStar,
   FaCog,
-  FaHistory,
-  FaSpinner,
   FaCheck,
-  FaFilter,
-  FaSort
+  FaKey,
+  FaExternalLinkAlt,
+  FaInfoCircle,
+  FaWifi,
+  FaExclamationTriangle,
+  FaBug,
+  FaTrash,
+  FaTools,
+  
 } from "react-icons/fa";

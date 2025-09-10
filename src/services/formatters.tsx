@@ -1,35 +1,15 @@
 // services/formatters.ts
-import { Achievement } from "../models";
-
-export function formatGlobalPercent(percent: any): string {
-  if (percent === null || percent === undefined || isNaN(percent)) {
-    return "N/A";
-  }
-  return `${Number(percent).toFixed(1)}%`;
+export function formatGlobalPercent(percent: number | null): string {
+  return percent != null ? `${percent.toFixed(1)}%` : "N/A";
 }
 
-export function calculateProgress(unlocked: any, total: any): number {
-  const unlockedNum = Number(unlocked) || 0;
-  const totalNum = Number(total) || 0;
-
-  if (totalNum === 0) {
-    return 0;
-  }
-
-  const progress = Math.round(unlockedNum / totalNum * 100);
-  return progress;
+export function calculateProgress(unlocked: number, total: number): number {
+  return total > 0 ? Math.round((unlocked / total) * 100) : 0;
 }
 
-export function formatProgressText(unlocked: any, total: any, showPercentage = false): string {
-  const unlockedNum = Number(unlocked) || 0;
-  const totalNum = Number(total) || 0;
-
-  if (showPercentage) {
-    const percentage = totalNum > 0 ? Math.round((unlockedNum / totalNum) * 100) : 0;
-    return `${unlockedNum} / ${totalNum} achievements (${percentage}%)`;
-  }
-
-  return `${unlockedNum} / ${totalNum} achievements`;
+export function formatProgressText(unlocked: number, total: number, showPercentage = false): string {
+  const percentage = showPercentage && total > 0 ? ` (${Math.round((unlocked / total) * 100)}%)` : '';
+  return `${unlocked} / ${total} achievements${percentage}`;
 }
 
 export function formatTime(timestamp: number): string {
@@ -46,18 +26,27 @@ export function formatPlaytime(minutes?: number): string {
   return `${hours}h ${remainingMinutes}m`;
 }
 
-export function getRarestAchievement(achievements?: Achievement[]): Achievement | null {
-  if (!achievements || achievements.length === 0) return null;
-  return achievements.reduce((prev, curr) => {
-    if (
-      curr.global_percent !== null &&
-      !isNaN(curr.global_percent) &&
-      (prev.global_percent === null || curr.global_percent < prev.global_percent)
-    ) {
-      return curr;
-    }
-    return prev;
-  });
+
+export function getRarityInfo(globalPercent: number) {
+  if (globalPercent <= 1) return { color: "#E91E63", text: "Very Rare" };
+  if (globalPercent <= 5) return { color: "#FF9800", text: "Rare" };
+  if (globalPercent <= 10) return { color: "#2196F3", text: "Uncommon" };
+  if (globalPercent <= 25) return { color: "#4CAF50", text: "Common" };
+  return { color: "#9E9E9E", text: "Common" };
+}
+
+export function convertRecentToAchievement(recent: { achievement_name: string; achievement_desc: string; icon: string; unlock_time: number; global_percent: number }) {
+  return {
+    api_name: recent.achievement_name.toLowerCase().replace(/[^a-z0-9]/g, '_'),
+    display_name: recent.achievement_name,
+    description: recent.achievement_desc,
+    icon: recent.icon,
+    icon_gray: recent.icon,
+    hidden: false,
+    unlocked: true,
+    unlock_time: recent.unlock_time,
+    global_percent: recent.global_percent
+  };
 }
 
 export function getMilestoneInfo(achievementCount: number): { title: string; description: string; next: string } {

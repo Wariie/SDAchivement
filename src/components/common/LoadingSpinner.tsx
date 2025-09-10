@@ -1,6 +1,6 @@
 // components/common/LoadingSpinner.tsx
 import { VFC, useEffect } from "react";
-import { FaSync } from "react-icons/fa";
+import { FaSync } from "../../utils/icons";
 import { LoadingSpinnerProps } from "../../models";
 
 export const LoadingSpinner: VFC<LoadingSpinnerProps> = ({

@@ -1,10 +1,11 @@
 // components/common/ProgressDisplay.tsx
-import { VFC } from "react";
+import { VFC, memo } from "react";
 import { ProgressBarWithInfo } from "@decky/ui";
 import { ProgressDisplayProps } from "../../models";
 import { calculateProgress, formatProgressText } from "../../services/formatters";
+import { STEAM_API_DEFAULTS } from "../../constants/steam";
 
-export const ProgressDisplay: VFC<ProgressDisplayProps> = ({
+export const ProgressDisplay: VFC<ProgressDisplayProps> = memo(({
   unlocked,
   total,
   showPercentage = false
@@ -14,7 +15,7 @@ export const ProgressDisplay: VFC<ProgressDisplayProps> = ({
       <ProgressBarWithInfo
         nProgress={calculateProgress(unlocked, total)}
         sOperationText={formatProgressText(unlocked, total, showPercentage)}
-        nTransitionSec={0.3}
+        nTransitionSec={STEAM_API_DEFAULTS.PROGRESS_TRANSITION_DURATION}
       />
 
       <div style={{
@@ -28,4 +29,4 @@ export const ProgressDisplay: VFC<ProgressDisplayProps> = ({
       </div>
     </>
   );
-};
+});

@@ -2,18 +2,14 @@
 import { useState, useCallback } from "react";
 import { toaster } from "@decky/api";
 import {
-  getAchievements,
-  getRecentAchievements,
-  getAchievementProgress,
-  getRecentlyPlayedGames,
-  refreshCache
-} from "../services/api";
-import {
   AchievementData,
   RecentAchievement,
   OverallProgress,
   GameInfo
 } from "../models";
+import { hybridAPI } from "../services/hybridApi";
+import { STEAM_API_DEFAULTS } from "../constants/steam";
+import { logger } from "../utils/logger";
 
 export interface UseAchievementsReturn {
   // State
@@ -26,9 +22,9 @@ export interface UseAchievementsReturn {
 
   // Actions
   fetchAchievements: (appId?: number) => Promise<void>;
-  fetchRecentAchievements: () => Promise<void>;
+  fetchRecentAchievements: (forceRefresh?: boolean) => Promise<void>;
   fetchRecentlyPlayedGames: () => Promise<void>;
-  fetchOverallProgress: () => Promise<void>;
+  fetchOverallProgress: (forceRefresh?: boolean) => Promise<void>;
   handleRefresh: (appId?: number) => Promise<void>;
   clearAchievements: () => void;
 }
@@ -45,7 +41,7 @@ export const useAchievements = (): UseAchievementsReturn => {
     setIsLoading(true);
     setLoadingMessage("Loading achievements...");
     try {
-      const result = await getAchievements(appId);
+      const result = await hybridAPI.getAchievements(appId);
       if (result && !result.error) {
         setAchievements(result);
       } else if (result?.error) {
@@ -57,7 +53,7 @@ export const useAchievements = (): UseAchievementsReturn => {
         setAchievements(null);
       }
     } catch (error) {
-      console.error("Failed to fetch achievements:", error);
+      logger.error("Failed to fetch achievements:", error);
       toaster.toast({
         title: "Error",
         body: "Failed to fetch achievements",
@@ -70,16 +66,16 @@ export const useAchievements = (): UseAchievementsReturn => {
     }
   }, []);
 
-  const fetchRecentAchievements = useCallback(async () => {
+  const fetchRecentAchievements = useCallback(async (forceRefresh: boolean = false) => {
     setIsLoading(true);
-    setLoadingMessage("Loading recent achievements...");
+    setLoadingMessage(forceRefresh ? "Refreshing recent achievements..." : "Loading recent achievements...");
     try {
-      const result = await getRecentAchievements(20);
+      const result = await hybridAPI.getRecentAchievements(STEAM_API_DEFAULTS.RECENT_ACHIEVEMENTS_LIMIT, forceRefresh);
       if (result) {
         setRecentAchievements(result);
       }
     } catch (error) {
-      console.error("Failed to fetch recent achievements:", error);
+      logger.error("Failed to fetch recent achievements:", error);
       toaster.toast({
         title: "Error",
         body: "Failed to fetch recent achievements",
@@ -95,12 +91,12 @@ export const useAchievements = (): UseAchievementsReturn => {
     setIsLoading(true);
     setLoadingMessage("Loading recently played games...");
     try {
-      const result = await getRecentlyPlayedGames(5);
+      const result = await hybridAPI.getRecentlyPlayedGames(STEAM_API_DEFAULTS.RECENT_GAMES_UI_COUNT);
       if (result) {
         setRecentlyPlayedGames(result);
       }
     } catch (error) {
-      console.error("Failed to fetch recently played games:", error);
+      logger.error("Failed to fetch recently played games:", error);
       toaster.toast({
         title: "Error",
         body: "Failed to fetch recently played games",
@@ -112,27 +108,56 @@ export const useAchievements = (): UseAchievementsReturn => {
     }
   }, []);
 
-  const fetchOverallProgress = useCallback(async () => {
+  const fetchOverallProgress = useCallback(async (forceRefresh: boolean = false) => {
     setIsLoading(true);
-    setLoadingMessage("Calculating overall progress...");
-    try {
-      const result = await getAchievementProgress();
-      if (result && !result.error) {
-        setOverallProgress(result);
-      } else if (result?.error) {
-        toaster.toast({
-          title: "Error",
-          body: result.error,
-          critical: true
-        });
+    setLoadingMessage(forceRefresh ? "Recalculating overall progress..." : "Loading overall progress...");
+    
+    const pollForResult = async (maxAttempts: number = STEAM_API_DEFAULTS.PROGRESS_POLL_MAX_ATTEMPTS, delay: number = STEAM_API_DEFAULTS.PROGRESS_POLL_DELAY): Promise<void> => {
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+          const result = await hybridAPI.getAchievementProgress(forceRefresh);
+          
+          if (result && !result.error) {
+            setOverallProgress(result);
+            return; // Success - exit polling
+          } else if (result?.error?.includes("in progress")) {
+            // Calculation still in progress - continue polling
+            setLoadingMessage(`Calculating progress... (${Math.round(attempt * delay / 1000)}s)`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            continue;
+          } else if (result?.error) {
+            // Real error - show toast and exit
+            toaster.toast({
+              title: "Error",
+              body: result.error,
+              critical: true
+            });
+            return;
+          }
+        } catch (error) {
+          logger.error(`Failed to fetch overall progress (attempt ${attempt}):`, error);
+          if (attempt === maxAttempts) {
+            toaster.toast({
+              title: "Error",
+              body: "Failed to fetch overall progress after multiple attempts",
+              critical: true
+            });
+          } else {
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
+        }
       }
-    } catch (error) {
-      console.error("Failed to fetch overall progress:", error);
+      
+      // If we get here, all attempts failed
       toaster.toast({
-        title: "Error",
-        body: "Failed to fetch overall progress",
+        title: "Timeout",
+        body: "Progress calculation timed out. Please try again.",
         critical: true
       });
+    };
+    
+    try {
+      await pollForResult();
     } finally {
       setIsLoading(false);
       setLoadingMessage("");
@@ -141,7 +166,7 @@ export const useAchievements = (): UseAchievementsReturn => {
 
   const handleRefresh = useCallback(async (appId?: number) => {
     try {
-      await refreshCache(appId);
+      await hybridAPI.refreshCache(appId);
       if (appId) {
         await fetchAchievements(appId);
       }
@@ -150,7 +175,7 @@ export const useAchievements = (): UseAchievementsReturn => {
         body: "Achievement data updated"
       });
     } catch (error) {
-      console.error("Failed to refresh:", error);
+      logger.error("Failed to refresh:", error);
       toaster.toast({
         title: "Error",
         body: "Failed to refresh data",
@@ -165,6 +190,9 @@ export const useAchievements = (): UseAchievementsReturn => {
     setRecentlyPlayedGames([]);
     setOverallProgress(null);
   }, []);
+
+  // REMOVED: Auto-refresh for recent achievements to prevent high CPU usage
+  // Recent achievements are cached for 2 minutes and will refresh naturally when accessed
 
   return {
     // State

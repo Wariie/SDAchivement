@@ -7,7 +7,7 @@ import {
   PanelSection,
   PanelSectionRow
 } from "@decky/ui";
-import { FaCog, FaGamepad } from "react-icons/fa";
+import { FaCog, FaGamepad } from "../../utils/icons";
 
 interface AdvancedSettingsModalProps {
   currentTestGameId: string;

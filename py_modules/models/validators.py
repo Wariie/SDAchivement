@@ -4,39 +4,6 @@ Data validation functions for achievement data
 import decky
 from typing import Dict
 
-
-def validate_achievement_data(data: Dict) -> Dict:
-    """Ensure achievement data has correct types for frontend"""
-    try:
-        validated = {
-            "app_id": int(data.get("app_id", 0)),
-            "total": int(data.get("total", 0)),
-            "unlocked": int(data.get("unlocked", 0)),
-            "percentage": float(data.get("percentage", 0.0)),
-            "achievements": data.get("achievements", [])
-        }
-        
-        if "error" in data:
-            validated["error"] = data["error"]
-            
-        decky.logger.debug(
-            f"Validated achievement data: {validated['unlocked']}/{validated['total']} "
-            f"({validated['percentage']}%)"
-        )
-        return validated
-        
-    except Exception as e:
-        decky.logger.error(f"Failed to validate achievement data: {e}")
-        return {
-            "app_id": 0,
-            "total": 0,
-            "unlocked": 0,
-            "percentage": 0.0,
-            "achievements": [],
-            "error": f"Data validation failed: {str(e)}"
-        }
-
-
 def validate_progress_data(data: Dict) -> Dict:
     """Ensure overall progress data has correct types for frontend"""
     try:

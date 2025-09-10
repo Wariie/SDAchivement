@@ -1,8 +1,10 @@
 // hooks/useGameArtwork.tsx
 import { useState, useEffect } from "react";
-import { getGameArtwork } from "../services/api";
+import { getGameArtwork, getSteamGridDBArtwork } from "../services/api";
+import { STEAM_CDN_URLS } from "../constants/steam";
+import { logger } from "../utils/logger";
 
-export const useGameArtwork = (appId: number | null) => {
+export const useGameArtwork = (appId: number | null, skipLocalAndSteamDB: boolean = false) => {
   const [artwork, setArtwork] = useState<{
     grid: string | null;
     hero: string | null;
@@ -17,22 +19,50 @@ export const useGameArtwork = (appId: number | null) => {
       return;
     }
 
+    // For tracked games, skip expensive local/SteamGridDB searches - rely on Steam's header_image fallback
+    if (skipLocalAndSteamDB) {
+      setArtwork(null);
+      return;
+    }
+
     const fetchArtwork = async () => {
       try {
         setIsLoading(true);
-        const result = await getGameArtwork(appId);
+        
+        // First try local Steam artwork
+        const localResult = await getGameArtwork(appId);
 
         // Convert Record<string, string | null> to our expected type
-        const artworkData = {
-          grid: result.grid || null,
-          hero: result.hero || null,
-          logo: result.logo || null,
-          icon: result.icon || null
+        let artworkData = {
+          grid: localResult.grid || null,
+          hero: localResult.hero || null,
+          logo: localResult.logo || null,
+          icon: localResult.icon || null
         };
+
+        // If no local artwork found, try SteamGridDB fallback (local files only)
+        const hasAnyLocalArtwork = artworkData.grid || artworkData.hero || artworkData.logo || artworkData.icon;
+        
+        if (!hasAnyLocalArtwork) {
+          try {
+            const steamGridDBResult = await getSteamGridDBArtwork(appId);
+            artworkData = {
+              grid: steamGridDBResult.grid || artworkData.grid,
+              hero: steamGridDBResult.hero || artworkData.hero,
+              logo: steamGridDBResult.logo || artworkData.logo,
+              icon: steamGridDBResult.icon || artworkData.icon
+            };
+          } catch (steamGridDBError) {
+            logger.debug("SteamGridDB fallback failed", steamGridDBError);
+            // Continue with local artwork (which may be null)
+          }
+        }
+
+        // Don't auto-populate with Steam CDN URLs - let getBestImage handle fallbacks
 
         setArtwork(artworkData);
       } catch (error) {
-        console.error("Failed to fetch game artwork:", error);
+        logger.error("Failed to fetch game artwork:", error);
         setArtwork(null);
       } finally {
         setIsLoading(false);
@@ -40,14 +70,27 @@ export const useGameArtwork = (appId: number | null) => {
     };
 
     fetchArtwork();
-  }, [appId]);
+  }, [appId, skipLocalAndSteamDB]);
 
   // Helper function to get the best available image for banner/header use
   const getBestImage = (fallbackHeaderImage?: string): string | null => {
-    if (!artwork) return fallbackHeaderImage || null;
-
-    // Priority: hero > grid > fallback header_image
-    return artwork.hero || artwork.grid || fallbackHeaderImage || null;
+    // Priority: artwork.hero > artwork.grid > fallback header_image > Steam CDN
+    const artworkImage = artwork ? (artwork.hero || artwork.grid) : null;
+    
+    if (artworkImage) {
+      return artworkImage;
+    }
+    
+    if (fallbackHeaderImage) {
+      return fallbackHeaderImage;
+    }
+    
+    // Last resort: generate Steam CDN URL if we have app_id
+    if (appId) {
+      return STEAM_CDN_URLS.HEADER(appId);
+    }
+    
+    return null;
   };
 
   return {

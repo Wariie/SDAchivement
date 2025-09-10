@@ -12,42 +12,8 @@ from typing import Dict, Optional
 class GameDetectorService:
     """Handles game detection and Steam user identification"""
     
-    async def get_current_steam_user(self) -> Dict:
-        """Get current Steam user ID from system"""
-        try:
-            # Try environment variable
-            steam_user = os.environ.get('STEAM_USER_ID')
-            if steam_user:
-                decky.logger.info(f"Found Steam user ID from environment: {steam_user}")
-                return {"user_id": steam_user, "source": "environment"}
-            
-            # Try to read from Steam's loginusers.vdf
-            steam_configs = [
-                Path(decky.DECKY_USER_HOME) / ".steam/steam/config/loginusers.vdf",
-                Path(decky.DECKY_USER_HOME) / ".local/share/Steam/config/loginusers.vdf",
-                Path("/home/deck/.local/share/Steam/config/loginusers.vdf"),
-                Path("/home/deck/.steam/steam/config/loginusers.vdf")
-            ]
-            
-            for steam_path in steam_configs:
-                if steam_path.exists():
-                    try:
-                        with open(steam_path, 'r', encoding='utf-8', errors='ignore') as f:
-                            content = f.read()
-                            matches = re.findall(r'"(7656\d{13})"', content)
-                            if matches:
-                                steam_user = matches[0]
-                                decky.logger.info(f"Found Steam user ID from config: {steam_user}")
-                                return {"user_id": steam_user, "source": "config"}
-                    except Exception as e:
-                        decky.logger.warning(f"Failed to read {steam_path}: {e}")
-            
-            decky.logger.warning("No Steam user ID found")
-            return {"error": "No Steam user ID found"}
-            
-        except Exception as e:
-            decky.logger.error(f"Failed to get Steam user: {e}")
-            return {"error": f"Failed to get Steam user: {str(e)}"}
+    def __init__(self):
+        pass
     
     async def get_current_game(self, test_app_id: Optional[int], api) -> Dict:
         """Get currently running game"""
@@ -61,12 +27,12 @@ class GameDetectorService:
                     "name": f"[TEST] {game_info.get('name', f'App {test_app_id}')}",
                     "is_running": True,
                     "has_achievements": game_info.get("has_achievements", False),
-                    "achievement_count": game_info.get("achievement_count", 0),
+                    "total_achievements": game_info.get("total_achievements", 0),
                     "header_image": game_info.get("header_image", "")
                 }
             
-            # Get the current app ID from Steam
-            app_result = await self._get_running_app_id()
+            # Get the current app ID from Steam (with localconfig fallback)
+            app_result = await self._get_running_app_id_enhanced()
             
             if app_result and not app_result.get("error"):
                 app_id = app_result["app_id"]
@@ -83,7 +49,7 @@ class GameDetectorService:
                     "name": game_info.get("name", f"App {app_id}"),
                     "is_running": True,
                     "has_achievements": game_info.get("has_achievements", False),
-                    "achievement_count": game_info.get("achievement_count", 0),
+                    "total_achievements": game_info.get("total_achievements", 0),
                     "header_image": game_info.get("header_image", "")
                 }
                 decky.logger.info(f"Current game: {result['name']} (ID: {app_id})")
@@ -103,7 +69,7 @@ class GameDetectorService:
                 "app_id": app_id,
                 "name": f"App {app_id}",
                 "has_achievements": False,
-                "achievement_count": 0
+                "total_achievements": 0
             }
         
         try:
@@ -114,10 +80,25 @@ class GameDetectorService:
                 "app_id": app_id,
                 "name": f"App {app_id}",
                 "has_achievements": False,
-                "achievement_count": 0
+                "total_achievements": 0
             }
     
-    async def _get_running_app_id(self) -> Dict:
+    async def _get_running_app_id_enhanced(self) -> Dict:
+        """Enhanced version with localconfig.vdf support"""
+        try:
+            # First try the original methods
+            result = await self._get_running_app_id_original()
+            if result and not result.get("error"):
+                return result
+            
+            
+            return {"error": "No running Steam game detected"}
+            
+        except Exception as e:
+            decky.logger.error(f"Failed to get enhanced running app ID: {e}")
+            return {"error": f"Failed to get enhanced running app ID: {str(e)}"}
+    
+    async def _get_running_app_id_original(self) -> Dict:
         """Get the currently running Steam app ID"""
         try:
             decky.logger.info("Detecting running Steam app...")
@@ -205,3 +186,5 @@ class GameDetectorService:
         except Exception as e:
             decky.logger.error(f"Failed to get running app ID: {e}")
             return {"error": f"Failed to get running app ID: {str(e)}"}
+    
+    

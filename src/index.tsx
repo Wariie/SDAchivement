@@ -1,7 +1,6 @@
 // index.tsx - Final Refactored Main Entry Point
 import { staticClasses, definePlugin } from "@decky/ui";
-import { useState, useEffect, useCallback, VFC } from "react";
-import { FaTrophy } from "react-icons/fa";
+import { useState, useEffect, useCallback, useRef, VFC } from "react";
 
 // Import types
 import { Tab, GameInfo, TrackedGame, AchievementData } from "./models";
@@ -18,11 +17,17 @@ import { useSettings } from "./hooks/useSettings";
 import { useAchievements } from "./hooks/useAchievements";
 
 // Import services
-import { getCurrentGame, getAchievements, setTrackedGame as setTrackedGameAPI, clearTrackedGame, getInstalledGames } from "./services/api";
+import { hybridAPI } from "./services/hybridApi";
+import { FaTrophy } from "./utils/icons";
+import { logger } from "./utils/logger";
 
 // Main Content Component
 const Content: VFC = () => {
-  const [currentTab, setCurrentTab] = useState<Tab>(Tab.CURRENT_GAME);
+  const [currentTab, setCurrentTab] = useState<Tab>(() => {
+    // Load from localStorage on initialization
+    const savedTab = localStorage.getItem('sdachievement-current-tab');
+    return (savedTab && Object.values(Tab).includes(savedTab as Tab)) ? savedTab as Tab : Tab.CURRENT_GAME;
+  });
   const [currentGame, setCurrentGame] = useState<GameInfo | null>(null);
   const [trackedGame, setTrackedGame] = useState<TrackedGame | null>(null);
   const [trackedGameAchievements, setTrackedGameAchievements] = useState<AchievementData | null>(null);
@@ -36,13 +41,13 @@ const Content: VFC = () => {
   // Fetch current game
   const fetchCurrentGame = useCallback(async (): Promise<GameInfo | null> => {
     try {
-      const result = await getCurrentGame();
+      const result = await hybridAPI.getCurrentGame();
       if (result) {
         setCurrentGame(result);
         return result;
       }
     } catch (error) {
-      console.error("Failed to fetch current game:", error);
+      logger.error("Failed to fetch current game", error);
     }
     return null;
   }, []);
@@ -52,12 +57,12 @@ const Content: VFC = () => {
     if (!trackedGame) return;
 
     try {
-      const result = await getAchievements(trackedGame.app_id);
+      const result = await hybridAPI.getAchievements(trackedGame.app_id);
       if (result && !result.error) {
         setTrackedGameAchievements(result);
       }
     } catch (error) {
-      console.error("Failed to fetch tracked game achievements:", error);
+      logger.error("Failed to fetch tracked game achievements", error);
     }
   }, [trackedGame]);
 
@@ -89,7 +94,7 @@ const Content: VFC = () => {
     if (currentTab === Tab.OVERALL) {
       await achievements.fetchOverallProgress();
     }
-  }, [currentTab, fetchCurrentGame, achievements.fetchAchievements, achievements.fetchRecentAchievements, achievements.fetchOverallProgress]);
+  }, [currentTab]); // FIXED: Removed function dependencies that cause infinite loops
 
   // Initial load
   useEffect(() => {
@@ -104,12 +109,12 @@ const Content: VFC = () => {
 
           // Also load achievements for tracked game
           try {
-            const result = await getAchievements(settings.trackedGame.app_id);
+            const result = await hybridAPI.getAchievements(settings.trackedGame.app_id);
             if (result && !result.error) {
               setTrackedGameAchievements(result);
             }
           } catch (error) {
-            console.error("Failed to load tracked game achievements:", error);
+            logger.error("Failed to load tracked game achievements", error);
           }
         }
 
@@ -119,45 +124,78 @@ const Content: VFC = () => {
           await achievements.fetchAchievements(game.app_id);
         }
 
-        // Load installed games by scanning Steam installation
+        // Load games list (uses caching for better performance)
         try {
-          const installedGamesList = await getInstalledGames();
+          const gamesList = await hybridAPI.getGames(); // Uses cached version for fast loading
 
-          if (installedGamesList && Array.isArray(installedGamesList)) {
-            setInstalledGames(installedGamesList);
+          if (gamesList && Array.isArray(gamesList)) {
+            setInstalledGames(gamesList);
           } else {
-            console.error("Failed to get installed games:", installedGamesList);
+            logger.error("Failed to get games list:", gamesList);
             // Fallback to perfect games if scanning fails
             if (achievements.overallProgress?.perfect_games) {
-              setInstalledGames(achievements.overallProgress.perfect_games.slice(0, 50));
+              setInstalledGames(achievements.overallProgress.perfect_games);
             }
           }
         } catch (error) {
-          console.error("Failed to scan installed games:", error);
+          logger.error("Failed to get games list:", error);
         }
       } catch (error) {
-        console.error("Failed to initialize plugin:", error);
+        logger.error("Failed to initialize plugin:", error);
       }
     };
 
     initializePlugin();
   }, []);
 
-  // Auto-refresh effect
+  // Load data for restored tab after initial setup
   useEffect(() => {
-    if (settings.autoRefresh && currentTab === Tab.CURRENT_GAME) {
-      const interval = setInterval(async () => {
-        const game = await fetchCurrentGame();
-        if (game) {
-          await achievements.fetchAchievements(game.app_id);
+    if (!settings.settingsLoaded) return; // Wait for settings to load
+    
+    // Load data for the current tab (which might be restored from localStorage)
+    switch (currentTab) {
+      case Tab.RECENT:
+        if (achievements.recentAchievements.length === 0) {
+          achievements.fetchRecentAchievements();
+        }
+        break;
+      case Tab.OVERALL:
+        if (!achievements.overallProgress) {
+          achievements.fetchOverallProgress();
+        }
+        break;
+    }
+  }, [settings.settingsLoaded, currentTab]);
+
+  // Auto-refresh effect with optimized dependencies
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  
+  useEffect(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    
+    if (settings.autoRefresh && currentTab === Tab.CURRENT_GAME && settings.refreshInterval > 0) {
+      intervalRef.current = setInterval(async () => {
+        try {
+          const game = await fetchCurrentGame();
+          if (game?.app_id) {
+            await achievements.fetchAchievements(game.app_id);
+          }
+        } catch (error) {
+          logger.error('Auto-refresh error:', error);
         }
       }, settings.refreshInterval * 1000);
-
-      return () => clearInterval(interval);
     }
-    // Return undefined explicitly when no cleanup is needed
-    return undefined;
-  }, [settings.autoRefresh, settings.refreshInterval, currentTab, fetchCurrentGame, achievements.fetchAchievements]);
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, [settings.autoRefresh, settings.refreshInterval, currentTab]);
 
   // Sync tracked game from settings
   useEffect(() => {
@@ -172,12 +210,12 @@ const Content: VFC = () => {
       if (!trackedGameAchievements) {
         const loadTrackedAchievements = async () => {
           try {
-            const result = await getAchievements(settings.trackedGame!.app_id);
+            const result = await hybridAPI.getAchievements(settings.trackedGame!.app_id);
             if (result && !result.error) {
               setTrackedGameAchievements(result);
             }
           } catch (error) {
-            console.error("Failed to load tracked game achievements:", error);
+            logger.error("Failed to load tracked game achievements", error);
           }
         };
         loadTrackedAchievements();
@@ -188,9 +226,13 @@ const Content: VFC = () => {
     }
   }, [settings.trackedGame, settings.settingsLoaded, trackedGame, trackedGameAchievements, isClearingTrackedGame]);
 
+  // CurrentGameTab is now always available
+
   // Tab change handler
   const handleTabChange = (tab: Tab) => {
     setCurrentTab(tab);
+    // Save to localStorage
+    localStorage.setItem('sdachievement-current-tab', tab);
 
     // Load data when switching tabs
     switch (tab) {
@@ -215,13 +257,13 @@ const Content: VFC = () => {
   // Update installed games when overall progress changes (fallback if scan failed)
   useEffect(() => {
     if (achievements.overallProgress?.perfect_games && installedGames.length === 0) {
-      // Fallback: try to scan installed games first, then use perfect games
-      const tryLoadInstalledGames = async () => {
+      // Fallback: try to get games list first, then use perfect games
+      const tryLoadGamesList = async () => {
         try {
-          const installedGamesList = await getInstalledGames();
+          const gamesList = await hybridAPI.getGames();
 
-          if (installedGamesList && Array.isArray(installedGamesList) && installedGamesList.length > 0) {
-            setInstalledGames(installedGamesList);
+          if (gamesList?.length > 0) {
+            setInstalledGames(gamesList);
           } else {
             // Use perfect games as final fallback
             if (achievements.overallProgress?.perfect_games) {
@@ -229,35 +271,35 @@ const Content: VFC = () => {
             }
           }
         } catch (error) {
-          console.error("Fallback scan failed, using perfect games:", error);
+          logger.error("Fallback games fetch failed, using perfect games:", error);
           if (achievements.overallProgress?.perfect_games) {
             setInstalledGames(achievements.overallProgress.perfect_games);
           }
         }
       };
 
-      tryLoadInstalledGames();
+      tryLoadGamesList();
     }
   }, [achievements.overallProgress, installedGames.length]);
 
   // Tracked game handlers
   const handleSetTrackedGame = async (game: TrackedGame) => {
     try {
-      const success = await setTrackedGameAPI(game.app_id, game.name);
+      const success = await hybridAPI.setTrackedGame(game.app_id, game.name);
       if (success) {
         setTrackedGame(game); // This is the state setter, not the API function
         // Also fetch achievements for the newly tracked game
-        const result = await getAchievements(game.app_id);
+        const result = await hybridAPI.getAchievements(game.app_id);
         if (result && !result.error) {
           setTrackedGameAchievements(result);
         }
         // Reload settings to ensure persistence
         await settings.loadPluginSettings();
       } else {
-        console.error("Failed to save tracked game to backend");
+        logger.error("Failed to save tracked game to backend");
       }
     } catch (error) {
-      console.error("Failed to save tracked game:", error);
+      logger.error("Failed to save tracked game:", error);
     }
   };
 
@@ -267,7 +309,7 @@ const Content: VFC = () => {
       // Set clearing flag to prevent sync interference
       setIsClearingTrackedGame(true);
 
-      const success = await clearTrackedGame();
+      const success = await hybridAPI.clearTrackedGame();
 
       if (success) {
 
@@ -279,11 +321,11 @@ const Content: VFC = () => {
         await settings.loadPluginSettings();
 
       } else {
-        console.error("Clear tracked game API returned false");
+        logger.error("Clear tracked game API returned false");
       }
 
     } catch (error) {
-      console.error("Failed to clear tracked game:", error);
+      logger.error("Failed to clear tracked game:", error);
     } finally {
       // Always clear the flag after operation
       setIsClearingTrackedGame(false);
@@ -300,7 +342,7 @@ const Content: VFC = () => {
             achievements={achievements.achievements}
             trackedGame={trackedGame}
             trackedGameAchievements={trackedGameAchievements}
-            installedGames={installedGames}
+            games={installedGames}
             isLoading={achievements.isLoading}
             loadingMessage={achievements.loadingMessage}
             onRefreshGame={handleRefreshGame}
@@ -316,7 +358,6 @@ const Content: VFC = () => {
           <RecentTab
             recentAchievements={achievements.recentAchievements}
             isLoading={achievements.isLoading}
-            onFetchRecent={achievements.fetchRecentAchievements}
           />
         );
 
@@ -326,11 +367,7 @@ const Content: VFC = () => {
             overallProgress={achievements.overallProgress}
             recentlyPlayedGames={achievements.recentlyPlayedGames}
             isLoading={achievements.isLoading}
-            onFetchProgress={achievements.fetchOverallProgress}
             onFetchRecentlyPlayed={achievements.fetchRecentlyPlayedGames}
-            onGameClick={(_gameId) => {
-              // Could navigate to game details or set as tracked game
-            }}
           />
         );
 
@@ -338,9 +375,10 @@ const Content: VFC = () => {
         return (
           <SettingsTabModal
             settings={settings}
-            installedGames={installedGames}
+            games={installedGames}
             trackedGame={trackedGame}
             onFullRefresh={handleFullRefresh}
+            onForceRefreshRecent={() => achievements.fetchRecentAchievements(true)}
             onSetTrackedGame={handleSetTrackedGame}
             onClearTrackedGame={handleClearTrackedGame}
           />

@@ -1,7 +1,7 @@
 // components/common/TabNavigation.tsx
 import { VFC } from "react";
 import { PanelSection, DialogButton, Focusable } from "@decky/ui";
-import { FaGamepad, FaClock, FaChartLine, FaKey } from "react-icons/fa";
+import { FaGamepad, FaClock, FaChartLine, FaKey } from "../../utils/icons";
 import { Tab, TabNavigationProps } from "../../models";
 
 export const TabNavigation: VFC<TabNavigationProps> = ({ currentTab, onTabChange }) => {

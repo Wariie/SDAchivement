@@ -2,7 +2,6 @@
 Settings management service
 """
 import json
-import re
 import asyncio
 import decky
 from pathlib import Path
@@ -92,22 +91,6 @@ class SettingsService:
             decky.logger.error(f"Failed to set API key: {e}")
             return False
     
-    async def set_user_id(self, user_id: str) -> bool:
-        """Set Steam user ID"""
-        try:
-            decky.logger.info(f"Setting Steam user ID: {user_id}")
-            
-            # Validate Steam ID format
-            if not re.match(r'^7656\d{13}$', user_id):
-                decky.logger.error(f"Invalid Steam ID format: {user_id}")
-                return False
-            
-            settings = self.settings.copy()
-            settings['steam_user_id'] = user_id
-            return await self.save(settings)
-        except Exception as e:
-            decky.logger.error(f"Failed to set Steam user ID: {e}")
-            return False
     
     async def set_test_game(self, app_id: int) -> bool:
         """Set test game ID"""
@@ -162,3 +145,4 @@ class SettingsService:
     def get_tracked_game(self) -> Optional[Dict]:
         """Get current tracked game"""
         return self.settings.get('tracked_game')
+    

@@ -2,11 +2,28 @@
 Achievement service for fetching and processing achievement data
 """
 import time
-import json
 import asyncio
 import decky
-from typing import Dict, List, Optional
-from models.validators import validate_achievement_data, validate_progress_data
+from typing import Dict, List
+
+
+from constants import TIMEOUTS, CONCURRENCY
+from models.validators import validate_progress_data
+
+
+async def _as_completed_with_progress(coros, progress_interval):
+    """Yield results as tasks complete"""
+    tasks = [asyncio.create_task(coro) for coro in coros]
+    pending = set(tasks)
+    
+    while pending:
+        done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
+        for task in done:
+            try:
+                result = await task
+                yield result
+            except Exception as e:
+                yield e
 
 
 class AchievementService:
@@ -17,6 +34,33 @@ class AchievementService:
         self.cache_service = cache_service
         self.api_key = api_key
         self.user_id = user_id
+        self._init_progress_tracking()
+    
+    async def close(self):
+        """Clean up resources when service is no longer needed"""
+        try:
+            decky.logger.info("Closing AchievementService...")
+            
+            # Close API if it has a close method
+            if self.api and hasattr(self.api, 'close'):
+                await self.api.close()
+            
+            # Clear references
+            self.api = None
+            self.cache_service = None
+            self.api_key = None
+            self.user_id = None
+            
+            decky.logger.info("AchievementService cleanup completed")
+            
+        except Exception as e:
+            decky.logger.warning(f"Error during AchievementService cleanup: {e}")
+    
+    def _init_progress_tracking(self):
+        """Initialize progress tracking attributes"""
+        self._progress_lock = asyncio.Lock()  # Prevent concurrent expensive operations
+        self._is_processing = False  # Track if progress calculation is running
+        self._processing_start_time = 0  # Track when processing started
     
     async def get_achievements(self, app_id: int) -> Dict:
         """Get achievements for a specific game"""
@@ -27,46 +71,14 @@ class AchievementService:
             if not self.api_key or not self.user_id:
                 return {"error": "Steam API key or user ID not configured"}
 
-            decky.logger.info(f"Getting achievements for app {app_id}")
             result = await self.api.get_player_achievements(app_id)
             
-            # Validate the data before returning
-            if result and not result.get("error"):
-                result = validate_achievement_data(result)
             
             return result
 
         except Exception as e:
             decky.logger.error(f"Failed to get achievements: {e}")
             return {"error": f"Failed to get achievements: {str(e)}"}
-    
-    async def get_game_stats(self, app_id: int) -> Dict:
-        """Get detailed game statistics"""
-        try:
-            if not self.api or not self.api_key or not self.user_id:
-                return {"error": "Steam API not configured"}
-            
-            decky.logger.info(f"Getting game stats for app {app_id}")
-            
-            result = await self.api.get_user_stats_for_game(app_id)
-            if result:
-                stats = result.get("playerstats", {}).get("stats", [])
-                
-                # Process stats into readable format
-                processed_stats = {}
-                for stat in stats:
-                    processed_stats[stat["name"]] = stat["value"]
-                
-                return {
-                    "app_id": app_id,
-                    "stats": processed_stats
-                }
-            else:
-                return {"error": "Failed to retrieve stats"}
-                        
-        except Exception as e:
-            decky.logger.error(f"Failed to get game stats: {e}")
-            return {"error": "Failed to retrieve stats"}
     
     async def get_recent_achievements(self, limit: int = 10) -> List[Dict]:
         """Get recently unlocked achievements across all games"""
@@ -134,58 +146,93 @@ class AchievementService:
             if not self.api or not self.api_key or not self.user_id:
                 return {"error": "Not configured"}
             
-            # Try to get from cache first
-            if not force_refresh:
-                cached_data = await self.cache_service.get_progress_cache()
+            # Block if already processing (unless force_refresh)
+            if not force_refresh and self._is_processing:
+                # Safety timeout: If processing for more than configured time, reset the flag
+                if time.time() - self._processing_start_time > TIMEOUTS["PROGRESS_CALCULATION"]:
+                    decky.logger.warning("Progress calculation timeout - resetting processing flag")
+                    self._is_processing = False
+                else:
+                    decky.logger.info("Progress calculation blocked: Another calculation already in progress")
+                    cached_data = await self.cache_service.get_overall_progress()
+                    if cached_data:
+                        return validate_progress_data(cached_data)
+                    else:
+                        return {"error": "Progress calculation in progress, try again later"}
+            
+            # Use lock to prevent concurrent expensive operations
+            if self._progress_lock.locked() and not force_refresh:
+                decky.logger.info("Progress calculation blocked: Lock already acquired")
+                cached_data = await self.cache_service.get_overall_progress()
                 if cached_data:
-                    # Validate game count hasn't changed significantly
-                    owned_games = await self.api.get_owned_games()
-                    if owned_games and not owned_games.get("error"):
-                        current_count = len(owned_games.get("response", {}).get("games", []))
-                        cached_count = cached_data.get("total_games", 0)
-                        
-                        if abs(current_count - cached_count) <= 5:
-                            decky.logger.info("Using cached overall progress")
-                            return validate_progress_data(cached_data)
+                    return validate_progress_data(cached_data)
+                else:
+                    return {"error": "Progress calculation in progress, try again later"}
             
-            decky.logger.info("Calculating fresh overall achievement progress")
+            async with self._progress_lock:
+                self._is_processing = True
+                self._processing_start_time = time.time()
+                
+                # Try to get from cache first (after acquiring lock)
+                if not force_refresh:
+                    cached_data = await self.cache_service.get_overall_progress()
+                    if cached_data:
+                        # Validate game count hasn't changed significantly
+                        owned_games = await self.api.get_owned_games()
+                        if owned_games and not owned_games.get("error"):
+                            current_count = len(owned_games.get("response", {}).get("games", []))
+                            cached_count = cached_data.get("total_games", 0)
+                            
+                            if abs(current_count - cached_count) <= 5:
+                                decky.logger.info("Using cached overall progress")
+                                self._is_processing = False
+                                return validate_progress_data(cached_data)
+                
+                decky.logger.info("Calculating fresh overall achievement progress")
+                
+                # Get owned games
+                owned_games = await self.api.get_owned_games()
+                if not owned_games or owned_games.get("error"):
+                    error_msg = owned_games.get("error", "Unknown error") if owned_games else "No response from API"
+                    return {"error": f"Failed to get owned games: {error_msg}"}
+                
+                games = owned_games.get("response", {}).get("games", [])
+                
+                # Pre-filter games without community stats to save API calls
+                games_with_stats = [game for game in games if game.get("has_community_visible_stats")]
+                skipped_games = len(games) - len(games_with_stats)
+                
+                decky.logger.info(f"Pre-filtered {skipped_games} games without community stats, processing {len(games_with_stats)} games")
+                
+                total_achievements = 0
+                unlocked_achievements = 0
+                perfect_games = []
+                games_with_achievements = 0
+                processed_games = 0
             
-            # Get owned games
-            owned_games = await self.api.get_owned_games()
-            if not owned_games or owned_games.get("error"):
-                error_msg = owned_games.get("error", "Unknown error") if owned_games else "No response from API"
-                return {"error": f"Failed to get owned games: {error_msg}"}
+            semaphore = asyncio.Semaphore(CONCURRENCY["MAX_GAMES"])  # Limit concurrent games
+            progress_interval = max(1, len(games_with_stats) // 4)
             
-            games = owned_games.get("response", {}).get("games", [])
-            
-            total_achievements = 0
-            unlocked_achievements = 0
-            perfect_games = []
-            games_with_achievements = 0
-            processed_games = 0
-            
-            # Process games concurrently in controlled batches
-            batch_size = 8  # Process 8 games at a time
-            semaphore = asyncio.Semaphore(4)  # Limit concurrent API requests to 4
-            
-            async def process_game(game):
-                """Process a single game with semaphore control"""
+            async def process_game(game, index):
+                """Process a single game"""
                 async with semaphore:
-                    # Skip games without community visible stats
                     if not game.get("has_community_visible_stats"):
                         return None
                         
                     try:
                         achievements = await self.get_achievements(game["appid"])
                         if achievements and isinstance(achievements, dict) and not achievements.get("error"):
+                            if "total" in achievements and achievements["total"] == 0:
+                                return None
+                            
                             if "total" in achievements and achievements["total"] > 0:
                                 result = {
                                     "achievements": achievements,
                                     "game": game,
-                                    "is_perfect": achievements["unlocked"] == achievements["total"]
+                                    "is_perfect": achievements["unlocked"] == achievements["total"],
+                                    "index": index  # For progress tracking
                                 }
                                 
-                                # Get header image for perfect games only
                                 if result["is_perfect"]:
                                     try:
                                         app_details = await self.api.get_app_details(game["appid"])
@@ -199,38 +246,46 @@ class AchievementService:
                         decky.logger.warning(f"Failed to get achievements for {game.get('name', game['appid'])}: {e}")
                     return None
             
-            # Process games in batches to avoid overwhelming the API
-            total_batches = (len(games) + batch_size - 1) // batch_size
-            decky.logger.info(f"Processing {len(games)} games in {total_batches} batches")
+            # Process all games concurrently with progress logging
+            decky.logger.info(f"Processing {len(games_with_stats)} games concurrently (max {CONCURRENCY['MAX_GAMES']} at once)")
             
-            for i in range(0, len(games), batch_size):
-                batch = games[i:i + batch_size]
-                
-                # Process batch concurrently
-                tasks = [process_game(game) for game in batch]
-                results = await asyncio.gather(*tasks, return_exceptions=True)
-                
-                # Process results from this batch
-                for result in results:
-                    if result and not isinstance(result, Exception):
-                        games_with_achievements += 1
-                        total_achievements += result["achievements"]["total"]
-                        unlocked_achievements += result["achievements"]["unlocked"]
-                        processed_games += 1
-                        
-                        if result["is_perfect"]:
-                            perfect_games.append({
-                                "name": result["game"].get("name", f"App {result['game']['appid']}"),
-                                "app_id": result["game"]["appid"],
-                                "achievements": result["achievements"]["total"],
-                                "playtime_forever": result["game"].get("playtime_forever", 0),
-                                "header_image": result.get("header_image", "")
-                            })
-                
-                # Small delay between batches to be respectful to Steam's API
-                if i + batch_size < len(games):
-                    await asyncio.sleep(0.5)
+            start_time = time.time()
+            tasks = [process_game(game, i) for i, game in enumerate(games_with_stats)]
             
+            completed_count = 0
+            async for result in _as_completed_with_progress(tasks, progress_interval):
+                if result and not isinstance(result, Exception):
+                    games_with_achievements += 1
+                    total_achievements += result["achievements"]["total"]
+                    unlocked_achievements += result["achievements"]["unlocked"]
+                    processed_games += 1
+                    
+                    if result["is_perfect"]:
+                        perfect_games.append({
+                            "name": result["game"].get("name", f"App {result['game']['appid']}"),
+                            "app_id": result["game"]["appid"],
+                            "has_achievements": True,
+                            "total_achievements": result["achievements"]["total"],
+                            "unlocked_achievements": result["achievements"]["unlocked"], 
+                            "achievement_percentage": 100.0,
+                            "playtime_forever": result["game"].get("playtime_forever", 0),
+                            "header_image": result.get("header_image", "")
+                        })
+                
+                completed_count += 1
+                
+                if completed_count % progress_interval == 0 or completed_count == len(tasks):
+                    elapsed = time.time() - start_time
+                    progress_pct = (completed_count / len(tasks)) * 100
+                    
+                    try:
+                        import psutil
+                        memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
+                        decky.logger.info(f"Progress: {completed_count}/{len(tasks)} ({progress_pct:.1f}%) - {processed_games} games processed in {elapsed:.1f}s, Memory: {memory_mb:.1f}MB")
+                    except:
+                        decky.logger.info(f"Progress: {completed_count}/{len(tasks)} ({progress_pct:.1f}%) - {processed_games} games processed in {elapsed:.1f}s")
+                
+                
             average_completion = round((unlocked_achievements / total_achievements * 100) if total_achievements > 0 else 0, 1)
             
             result = {
@@ -246,14 +301,25 @@ class AchievementService:
             }
             
             # Cache the result
-            await self.cache_service.save_progress_cache(result)
+            await self.cache_service.save_overall_progress(result)
             
             # Validate and return
             result = validate_progress_data(result)
-            decky.logger.info(f"Progress complete: {result['unlocked_achievements']}/{result['total_achievements']}")
+            total_time = time.time() - start_time
+            decky.logger.info(f"Progress calculation complete: {result['unlocked_achievements']}/{result['total_achievements']} ({result['average_completion']}%) in {total_time:.1f}s")
+            
+            if self.api:
+                try:
+                    self.api.clear_all_caches()
+                except Exception as e:
+                    decky.logger.warning(f"Failed to clear API caches: {e}")
+            
+            
+            self._is_processing = False
             
             return result
                         
         except Exception as e:
+            self._is_processing = False
             decky.logger.error(f"Failed to get achievement progress: {e}")
             return {"error": f"Failed to calculate progress: {str(e)}"}

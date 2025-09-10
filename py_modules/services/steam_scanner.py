@@ -2,32 +2,41 @@
 Steam installation scanner service
 Scans local Steam installation to find installed games
 """
-import os
 import re
 import subprocess
+import asyncio
 import decky
 from pathlib import Path
 from typing import List, Dict, Optional
+from .localconfig_parser import LocalConfigParser
 
 
 class SteamScannerService:
     """Scans local Steam installation for installed games"""
     
     def __init__(self):
+        self.localconfig_parser = None
+        self.current_user_id = None
         self.steam_paths = [
             Path.home() / ".local/share/Steam",  # Default Steam path on Steam Deck
             Path("/home/deck/.steam/steam"),      # Alternative path
             Path("/home/deck/.local/share/Steam"), # Another common path
         ]
+        self._cached_steam_path = None  # Cache to prevent repeated logs
         
     def get_steam_path(self) -> Optional[Path]:
-        """Find the Steam installation path"""
+        """Find the Steam installation path with caching to prevent spam"""
+        if self._cached_steam_path is not None:
+            return self._cached_steam_path
+            
         for path in self.steam_paths:
             if path.exists() and path.is_dir():
                 decky.logger.info(f"Found Steam installation at: {path}")
+                self._cached_steam_path = path
                 return path
         
         decky.logger.warning("Could not find Steam installation path")
+        self._cached_steam_path = None
         return None
     
     def get_library_folders(self, steam_path: Path) -> List[Path]:
@@ -70,32 +79,79 @@ class SteamScannerService:
                 
         return library_folders
     
-    def scan_acf_files(self, steamapps_path: Path) -> List[Dict]:
-        """Scan .acf files in a steamapps directory"""
+    async def scan_acf_files_async(self, steamapps_path: Path) -> List[Dict]:
+        """Async scan .acf files in a steamapps directory"""
         installed_games = []
         
         try:
             acf_files = list(steamapps_path.glob("appmanifest_*.acf"))
             decky.logger.info(f"Found {len(acf_files)} ACF files in {steamapps_path}")
             
-            for acf_file in acf_files:
-                try:
-                    with open(acf_file, 'r', encoding='utf-8', errors='ignore') as f:
-                        content = f.read()
-                    
-                    # Parse ACF format
-                    app_info = self.parse_acf_content(content)
-                    if app_info:
-                        installed_games.append(app_info)
+            # Process files in batches to avoid overwhelming the system
+            batch_size = 10
+            loop = asyncio.get_event_loop()
+            
+            for i in range(0, len(acf_files), batch_size):
+                batch = acf_files[i:i + batch_size]
+                tasks = []
+                
+                for acf_file in batch:
+                    task = loop.run_in_executor(None, self._read_acf_file, acf_file)
+                    tasks.append(task)
+                
+                # Wait for batch to complete
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+                
+                for result in results:
+                    if isinstance(result, Exception):
+                        decky.logger.error(f"Error in ACF batch: {result}")
+                        continue
+                    if result:
+                        installed_games.append(result)
                         
-                except Exception as e:
-                    decky.logger.error(f"Error reading ACF file {acf_file}: {e}")
-                    continue
-                    
         except Exception as e:
             decky.logger.error(f"Error scanning ACF files in {steamapps_path}: {e}")
             
         return installed_games
+    
+    def _read_acf_file(self, acf_file: Path) -> Optional[Dict]:
+        """Helper method to read and parse a single ACF file"""
+        try:
+            with open(acf_file, 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read()
+            return self.parse_acf_content(content)
+        except Exception as e:
+            decky.logger.error(f"Error reading ACF file {acf_file}: {e}")
+            return None
+    
+    
+    def _initialize_localconfig_parser(self, user_id: str):
+        """Initialize LocalConfigParser for enhanced data"""
+        if self.current_user_id != user_id or not self.localconfig_parser:
+            self.current_user_id = user_id
+            self.localconfig_parser = LocalConfigParser(user_id)
+            decky.logger.info(f"SteamScanner: Initialized LocalConfigParser for user {user_id}")
+    
+    def _get_steam_user_from_config(self) -> Optional[str]:
+        """Get Steam user ID from loginusers.vdf"""
+        try:
+            steam_path = self.get_steam_path()
+            if not steam_path:
+                return None
+            
+            loginusers_path = steam_path / "config" / "loginusers.vdf"
+            if not loginusers_path.exists():
+                return None
+            
+            with open(loginusers_path, 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read()
+                import re
+                matches = re.findall(r'"(7656\d{13})"', content)
+                if matches:
+                    return matches[0]
+        except Exception as e:
+            decky.logger.warning(f"Failed to get Steam user from config: {e}")
+        return None
     
     def parse_acf_content(self, content: str) -> Optional[Dict]:
         """Parse ACF file content to extract game info"""
@@ -124,7 +180,7 @@ class SteamScannerService:
             is_installed = (state & 4) != 0
             
             if is_installed:
-                return {
+                game_data = {
                     "app_id": app_id,
                     "name": name,
                     "installdir": installdir,
@@ -134,10 +190,66 @@ class SteamScannerService:
                     "playtime_forever": 0
                 }
                 
+                # Enhance with localconfig data if available
+                if self.localconfig_parser:
+                    try:
+                        enhanced_data = self.localconfig_parser.get_enhanced_game_data(app_id)
+                        if enhanced_data:
+                            # Update with enhanced data
+                            game_data.update(enhanced_data)
+                            
+                            # Add formatted fields
+                            if enhanced_data.get("playtime_forever"):
+                                game_data["playtime_formatted"] = self._format_playtime(enhanced_data["playtime_forever"])
+                            
+                            if enhanced_data.get("last_played_date"):
+                                game_data["last_played_formatted"] = self._format_last_played(enhanced_data["last_played_date"])
+                            
+                            # Check recent activity
+                            game_data["recently_active"] = self.localconfig_parser.is_game_recently_active(app_id)
+                    except Exception as e:
+                        decky.logger.debug(f"Failed to enhance ACF data for {app_id}: {e}")
+                
+                return game_data
+                
         except Exception as e:
             decky.logger.error(f"Error parsing ACF content: {e}")
             
         return None
+    
+    def _format_playtime(self, minutes: int) -> str:
+        """Format playtime minutes into a readable string"""
+        if minutes < 60:
+            return f"{minutes} min"
+        elif minutes < 1440:  # Less than a day
+            hours = minutes / 60
+            return f"{hours:.1f} hours"
+        else:
+            hours = minutes / 60
+            return f"{hours:.0f} hours"
+    
+    def _format_last_played(self, last_played_date) -> str:
+        """Format last played date into a readable string"""
+        try:
+            from datetime import datetime
+            now = datetime.now()
+            diff = now - last_played_date
+            
+            if diff.days == 0:
+                if diff.seconds < 3600:  # Less than an hour
+                    minutes = diff.seconds // 60
+                    return f"{minutes} minutes ago"
+                else:
+                    hours = diff.seconds // 3600
+                    return f"{hours} hours ago"
+            elif diff.days == 1:
+                return "Yesterday"
+            elif diff.days < 7:
+                return f"{diff.days} days ago"
+            else:
+                return last_played_date.strftime("%B %d, %Y")
+        except Exception:
+            return "Unknown"
     
     async def get_installed_games(self) -> List[Dict]:
         """Get all installed Steam games by scanning ACF files"""
@@ -148,6 +260,11 @@ class SteamScannerService:
             if not steam_path:
                 return []
             
+            # Initialize LocalConfigParser if possible
+            user_id = self._get_steam_user_from_config()
+            if user_id:
+                self._initialize_localconfig_parser(user_id)
+            
             library_folders = self.get_library_folders(steam_path)
             if not library_folders:
                 decky.logger.warning("No Steam library folders found")
@@ -155,7 +272,7 @@ class SteamScannerService:
             
             all_games = []
             for library_folder in library_folders:
-                games = self.scan_acf_files(library_folder)
+                games = await self.scan_acf_files_async(library_folder)
                 all_games.extend(games)
                 decky.logger.info(f"Found {len(games)} games in {library_folder}")
             
@@ -169,6 +286,24 @@ class SteamScannerService:
             final_games.sort(key=lambda x: x["name"].lower())
             
             decky.logger.info(f"Total installed games found: {len(final_games)}")
+            
+            # Sort by recent activity if localconfig is available
+            if self.localconfig_parser:
+                try:
+                    # Sort by: recently active, then by last played, then by name
+                    def sort_key(game):
+                        recently_active = game.get("recently_active", False)
+                        last_played = game.get("last_played", 0)
+                        name = game.get("name", "").lower()
+                        
+                        # Priority: recently active games first, then by last played, then alphabetical
+                        return (not recently_active, -last_played, name)
+                    
+                    final_games.sort(key=sort_key)
+                    decky.logger.info("Sorted games by recent activity")
+                except Exception as e:
+                    decky.logger.warning(f"Failed to sort by activity: {e}")
+            
             return final_games
             
         except Exception as e:
@@ -211,8 +346,8 @@ class SteamScannerService:
                                   timeout=3)
             
             is_desktop = result.returncode == 0
-            #is_desktop = result.stdout != ""
             
             return is_desktop
-        except (subprocess.TimeoutExpired, FileNotFoundError, Exception) as e:
+        except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
             return False
+    

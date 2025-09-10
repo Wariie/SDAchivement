@@ -14,7 +14,6 @@ interface OverallTabProps {
   overallProgress: OverallProgress | null;
   recentlyPlayedGames: GameInfo[];
   isLoading: boolean;
-  onFetchProgress: () => Promise<void>;
   onFetchRecentlyPlayed: () => Promise<void>;
   onGameClick?: (gameId: number) => void;
 }
@@ -39,7 +38,7 @@ const PerfectGameListItem: VFC<{ game: GameInfo }> = memo(({ game }) => {
       <div style={{ flex: 1 }}>
         <div style={{ fontWeight: "bold", fontSize: "14px" }}>{game.name}</div>
         <div style={{ fontSize: "12px", opacity: 0.7 }}>
-          {game.achievements} achievements
+          {game.total_achievements} achievements
         </div>
       </div>
       <span style={{ color: "#4CAF50", fontWeight: "bold", fontSize: "13px" }}>100%</span>
@@ -68,9 +67,9 @@ const RecentlyPlayedGameListItem: VFC<{ game: GameInfo }> = ({ game }) => {
             e.currentTarget.style.display = "none";
           }}
         />
-      ) : game.header_image || getBestImage() ? (
+      ) : getBestImage(game.header_image) ? (
         <img
-          src={getBestImage(game.header_image) || game.header_image}
+          src={getBestImage(game.header_image)!}
           alt={game.name}
           style={{
             width: "32px",
@@ -127,13 +126,8 @@ const RecentlyPlayedGameModal: VFC<{ game: GameInfo; closeModal?: () => void }> 
         {/* Hero Image Banner */}
         <div style={modalStyles.heroImageBanner}>
           {(() => {
-            const bestImage = getBestImage(game.header_image);
-            let imageUrl = bestImage || game.header_image;
-
-            // Fallback to Steam CDN if no image URL
-            if (!imageUrl && game.app_id) {
-              imageUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${game.app_id}/header.jpg`;
-            }
+            // Trust getBestImage to handle all fallbacks including Steam CDN
+            const imageUrl = getBestImage(game.header_image);
 
             return imageUrl ? (
               <img
@@ -146,15 +140,8 @@ const RecentlyPlayedGameModal: VFC<{ game: GameInfo; closeModal?: () => void }> 
                 }}
                 alt={game.name}
                 onError={(e) => {
-                  // Try fallback Steam CDN URL if the original image failed
-                  const currentSrc = e.currentTarget.src;
-                  const steamCdnUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${game.app_id}/header.jpg`;
-
-                  if (currentSrc !== steamCdnUrl && game.app_id) {
-                    e.currentTarget.src = steamCdnUrl;
-                  } else {
-                    e.currentTarget.style.display = "none";
-                  }
+                  // If image fails to load, hide it gracefully  
+                  e.currentTarget.style.display = "none";
                 }}
               />
             ) : null;
@@ -286,14 +273,6 @@ const RecentlyPlayedGameModal: VFC<{ game: GameInfo; closeModal?: () => void }> 
             </div>
           )}
 
-          <div style={{
-            marginTop: "12px",
-            fontSize: "11px",
-            opacity: 0.6,
-            textAlign: "center"
-          }}>
-            App ID: {game.app_id}
-          </div>
         </div>
       </div>
     </ConfirmModal>
@@ -316,14 +295,8 @@ const PerfectGameModal: VFC<{ game: GameInfo; closeModal?: () => void }> = ({ ga
         {/* Hero Image Banner */}
         <div style={modalStyles.heroImageBanner}>
           {(() => {
-            const bestImage = getBestImage(game.header_image);
-            let imageUrl = bestImage || game.header_image;
-
-            // Fallback to Steam CDN if no image URL
-            if (!imageUrl && game.app_id) {
-              imageUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${game.app_id}/header.jpg`;
-            }
-
+            // Trust getBestImage to handle all fallbacks including Steam CDN
+            const imageUrl = getBestImage(game.header_image);
 
             return imageUrl ? (
               <img
@@ -336,16 +309,8 @@ const PerfectGameModal: VFC<{ game: GameInfo; closeModal?: () => void }> = ({ ga
                 }}
                 alt={game.name}
                 onError={(e) => {
-                  // Try fallback Steam CDN URL if the original image failed
-                  const currentSrc = e.currentTarget.src;
-                  const steamCdnUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${game.app_id}/header.jpg`;
-
-                  if (currentSrc !== steamCdnUrl && game.app_id) {
-                    e.currentTarget.src = steamCdnUrl;
-                  } else {
-                    // If all attempts fail, hide the image
-                    e.currentTarget.style.display = "none";
-                  }
+                  // If image fails to load, hide it gracefully
+                  e.currentTarget.style.display = "none";
                 }}
               />
             ) : null;
@@ -417,7 +382,7 @@ const PerfectGameModal: VFC<{ game: GameInfo; closeModal?: () => void }> = ({ ga
               textAlign: "center"
             }}>
               <div style={{ fontSize: "20px", fontWeight: "bold", color: "#4CAF50" }}>
-                {game.achievements}
+                {game.total_achievements}
               </div>
               <div style={{ fontSize: "11px", opacity: 0.7 }}>
                 Achievements
@@ -451,17 +416,8 @@ const PerfectGameModal: VFC<{ game: GameInfo; closeModal?: () => void }> = ({ ga
               🏆 Perfect Game Achievement
             </div>
             <div style={{ fontSize: "11px", opacity: 0.8 }}>
-              All {game.achievements} achievements unlocked!
+              All {game.total_achievements} achievements unlocked!
             </div>
-          </div>
-
-          <div style={{
-            marginTop: "12px",
-            fontSize: "11px",
-            opacity: 0.6,
-            textAlign: "center"
-          }}>
-            App ID: {game.app_id}
           </div>
         </div>
       </div>
@@ -473,7 +429,6 @@ export const OverallTab: VFC<OverallTabProps> = ({
   overallProgress,
   recentlyPlayedGames,
   isLoading,
-  onFetchProgress,
   onFetchRecentlyPlayed
 }) => {
   const getCompletionStats = () => {
@@ -680,29 +635,12 @@ export const OverallTab: VFC<OverallTabProps> = ({
           </PanelSectionRow>
         )}
 
-        <PanelSectionRow>
-          <ButtonItem
-            layout="below"
-            onClick={onFetchProgress}
-            disabled={isLoading}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px" }}>
-              <FaSync
-                style={{
-                  fontSize: "12px",
-                  animation: isLoading ? "spin 1s linear infinite" : "none"
-                }}
-              />
-              {isLoading ? "Calculating..." : "Calculate Progress"}
-            </div>
-          </ButtonItem>
-        </PanelSectionRow>
       </PanelSection>
 
       {/* Recently Played Games Section */}
-      {recentlyPlayedGames && recentlyPlayedGames.length > 0 && (
+      {recentlyPlayedGames?.length > 0 && (
         <PanelSection title="Recently Played Games">
-          <div style={{ maxHeight: "300px", overflowY: "auto", overflowX: "hidden" }}>
+          <div>
             <Focusable style={{ display: "flex", flexDirection: "column", gap: 0 }}>
               {recentlyPlayedGames.map((game) => (
                 <PanelSectionRow key={game.app_id}>
@@ -721,27 +659,22 @@ export const OverallTab: VFC<OverallTabProps> = ({
             </Focusable>
           </div>
           <PanelSectionRow>
-            <ButtonItem
-              layout="below"
-              onClick={onFetchRecentlyPlayed}
-              disabled={isLoading}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px" }}>
-                <FaSync
-                  style={{
-                    fontSize: "12px",
-                    animation: isLoading ? "spin 1s linear infinite" : "none"
-                  }}
-                />
-                {isLoading ? "Loading..." : "Refresh Recently Played"}
-              </div>
-            </ButtonItem>
+            <div style={{ 
+              textAlign: "center", 
+              padding: "8px", 
+              fontSize: "11px", 
+              opacity: 0.6,
+              borderRadius: "4px",
+              backgroundColor: "rgba(255,255,255,0.03)"
+            }}>
+              Recently played games from Steam library
+            </div>
           </PanelSectionRow>
         </PanelSection>
       )}
 
       {/* Load Recently Played Button - when no games are loaded */}
-      {(!recentlyPlayedGames || recentlyPlayedGames.length === 0) && (
+      {!recentlyPlayedGames?.length && (
         <PanelSection>
           <PanelSectionRow>
             <ButtonItem
@@ -766,9 +699,9 @@ export const OverallTab: VFC<OverallTabProps> = ({
       {/* Perfect Games Section */}
       {overallProgress?.perfect_games && overallProgress.perfect_games.length > 0 && (
         <PanelSection title="Perfect Games">
-          <div style={{ maxHeight: "300px", overflowY: "auto", overflowX: "hidden" }}>
+          <div>
             <Focusable style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-              {overallProgress.perfect_games.map((game) => (
+              {overallProgress.perfect_games!.map((game) => (
                 <PanelSectionRow key={game.app_id}>
                   <ButtonItem
                     layout="below"

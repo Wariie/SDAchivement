@@ -21,11 +21,6 @@ export interface AchievementData {
   error?: string;
 }
 
-export interface GameStats {
-  app_id: number;
-  stats: Record<string, number>;
-  error?: string;
-}
 
 export interface TrackedGame {
   app_id: number;
@@ -49,16 +44,18 @@ export interface GameInfo {
   name: string;
   is_running: boolean;
   has_achievements: boolean;
-  achievements?: number;
-  achievement_count?: number;
-  header_image?: string;
-  playtime_forever?: number; // Total playtime in minutes
-  playtime_2weeks?: number; // Recent playtime in minutes
-  img_icon_url?: string;
-  img_logo_url?: string;
   total_achievements?: number;
   unlocked_achievements?: number;
   achievement_percentage?: number;
+  
+  // Playtime info
+  playtime_forever?: number; // Total playtime in minutes
+  playtime_2weeks?: number; // Recent playtime in minutes
+  
+  // Image assets
+  header_image?: string;
+  img_icon_url?: string;
+  img_logo_url?: string;
 }
 
 export interface OverallProgress {
@@ -97,6 +94,7 @@ export interface AchievementListProps {
   showUnlockedOnly?: boolean;
   showLockedOnly?: boolean;
   isLoading?: boolean;
+  gameName?: string;
 }
 
 export interface GameBannerProps {

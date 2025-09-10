@@ -7,8 +7,9 @@ import {
   PanelSection,
   PanelSectionRow
 } from "@decky/ui";
-import { FaKey, FaExternalLinkAlt, FaCheck, FaTimes, FaClipboard } from "react-icons/fa";
-import { isDesktopMode } from "../../services/api";
+import { FaKey, FaExternalLinkAlt, FaCheck, FaTimes, FaClipboard } from "../../utils/icons";
+import { hybridAPI } from "../../services/hybridApi";
+import { logger } from "../../utils/logger";
 
 interface ApiKeyModalProps {
   currentApiKey: string;
@@ -52,13 +53,12 @@ export const ApiKeyModal: VFC<ApiKeyModalProps> = ({
   // Add this useEffect to detect Gaming Mode:
   useEffect(() => {
     const checkDesktopMode = () => {
-      isDesktopMode()
+      hybridAPI.isDesktopMode()
         .then(v => {
-          console.log("Current UI Mode:", v);
           setIsDesktopMode(v)
         })
         .catch(err => {
-          console.error("Failed to get UI mode:", err);
+          logger.error("Failed to get UI mode:", err);
           setIsDesktopMode(false);
         })// Default to false on error  
     };

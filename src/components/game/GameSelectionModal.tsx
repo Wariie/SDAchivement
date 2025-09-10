@@ -37,12 +37,10 @@ export const GameSelectionModal: VFC<GameSelectionModalProps> = ({
         />
 
         <div style={{
-          maxHeight: "300px",
-          overflowY: "auto",
           marginTop: "10px"
         }}>
           <Focusable style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-            {filteredGames.slice(0, 50).map((game) => (
+            {filteredGames.map((game) => (
               <ButtonItem
                 key={game.app_id}
                 layout="below"
@@ -56,7 +54,7 @@ export const GameSelectionModal: VFC<GameSelectionModalProps> = ({
                     {game.name}
                   </div>
                   <div style={{ fontSize: "12px", opacity: 0.7 }}>
-                    {game.achievements} achievements • App ID: {game.app_id}
+                    {game.total_achievements} achievements • App ID: {game.app_id}
                   </div>
                 </div>
               </ButtonItem>

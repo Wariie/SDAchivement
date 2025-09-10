@@ -14,7 +14,8 @@ export const AchievementList: VFC<AchievementListProps> = ({
   filterRarity,
   showUnlockedOnly = false,
   showLockedOnly = false,
-  isLoading = false
+  isLoading = false,
+  gameName
 }) => {
   const sortedAchievements = useMemo(() => {
     if (!achievements?.length) return [];
@@ -76,7 +77,7 @@ export const AchievementList: VFC<AchievementListProps> = ({
 
   const handleAchievementClick = (achievement: Achievement) => {
     showModal(
-      <AchievementDetailsModal achievement={achievement} />
+      <AchievementDetailsModal achievement={achievement} gameName={gameName} />
     );
   };
 
@@ -88,7 +89,7 @@ export const AchievementList: VFC<AchievementListProps> = ({
 
   if (!sortedAchievements.length) {
     // Only show message if we have achievements but they're filtered out
-    const hasAchievements = achievements && achievements.length > 0;
+    const hasAchievements = achievements?.length > 0;
     if (!hasAchievements) {
       return null; // Don't show anything if no achievements at all
     }

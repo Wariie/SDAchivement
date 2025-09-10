@@ -22,39 +22,14 @@ export const GameImage: React.VFC<GameImageProps> = ({
 }) => {
   const { getBestImage } = useGameArtwork(appId);
   const [hasError, setHasError] = useState(false);
-  const [currentSrc, setCurrentSrc] = useState<string | null>(null);
 
-  // Determine the best image source to use
-  const getImageSrc = (): string | null => {
-    if (hasError) return null;
+  // Get the best image source - trust getBestImage to handle all fallbacks
+  const imageSrc = hasError ? null : getBestImage(headerImage);
 
-    // Priority order: getBestImage result > headerImage prop > Steam CDN fallback
-    const bestImage = getBestImage(headerImage);
-    if (bestImage) return bestImage;
-
-    if (headerImage) return headerImage;
-
-    // Steam CDN fallback
-    if (appId) return `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/header.jpg`;
-
-    return null;
-  };
-
-  const imageSrc = getImageSrc();
-
-  const handleError = (e: React.SyntheticEvent<HTMLImageElement>) => {
-    const currentImageSrc = e.currentTarget.src;
-    const steamCdnUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/header.jpg`;
-
-    // If we haven't tried the Steam CDN fallback yet, try it
-    if (currentImageSrc !== steamCdnUrl && appId) {
-      setCurrentSrc(steamCdnUrl);
-      e.currentTarget.src = steamCdnUrl;
-    } else {
-      // All sources failed, show fallback or hide
-      setHasError(true);
-      onError?.();
-    }
+  const handleError = (_e: React.SyntheticEvent<HTMLImageElement>) => {
+    // If image fails to load, show fallback or hide
+    setHasError(true);
+    onError?.();
   };
 
   const handleLoad = () => {
@@ -76,7 +51,7 @@ export const GameImage: React.VFC<GameImageProps> = ({
   if (imageSrc) {
     return (
       <img
-        src={currentSrc || imageSrc}
+        src={imageSrc}
         alt={alt}
         style={style}
         onLoad={handleLoad}

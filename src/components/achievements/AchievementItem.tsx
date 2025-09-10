@@ -1,7 +1,7 @@
 // components/achievements/AchievementItem.tsx
-import { VFC } from "react";
+import { VFC, memo } from "react";
 import { PanelSectionRow, ButtonItem } from "@decky/ui";
-import { FaCheck, FaLock, FaStar } from "react-icons/fa";
+import { FaCheck, FaLock, FaStar } from "../../utils/icons";
 import { AchievementItemProps } from "../../models";
 import { formatGlobalPercent } from "../../services/formatters";
 
@@ -9,10 +9,11 @@ interface AchievementItemExtendedProps extends AchievementItemProps {
   onClick?: () => void;
 }
 
-export const AchievementItem: VFC<AchievementItemExtendedProps> = ({
+export const AchievementItem: VFC<AchievementItemExtendedProps> = memo(({
   achievement,
   onClick
 }) => {
+  
   return (
     <PanelSectionRow>
       <ButtonItem
@@ -21,15 +22,25 @@ export const AchievementItem: VFC<AchievementItemExtendedProps> = ({
       >
         <div style={{
           display: "flex",
-          alignItems: "center",
-          gap: "12px",
-          opacity: achievement.unlocked ? 1 : 0.6
+          alignItems: "flex-start",
+          justifyContent: "flex-start",
+          gap: "8px",
+          opacity: achievement.unlocked ? 1 : 0.6,
+          padding: "4px 0",
+          width: "100%",
+          textAlign: "left"
         }}>
           {/* Achievement Icon */}
           {achievement.icon && (
             <img
               src={achievement.unlocked ? achievement.icon : achievement.icon_gray}
-              style={{ width: "32px", height: "32px", borderRadius: "4px" }}
+              style={{ 
+                width: "48px", 
+                height: "48px", 
+                borderRadius: "4px",
+                flexShrink: 0,
+                marginTop: "2px"
+              }}
               alt=""
             />
           )}
@@ -40,17 +51,42 @@ export const AchievementItem: VFC<AchievementItemExtendedProps> = ({
               fontWeight: achievement.unlocked ? "bold" : "normal",
               fontSize: "14px",
               display: "flex",
-              alignItems: "center",
-              gap: "8px"
+              alignItems: "flex-start",
+              gap: "6px",
+              marginBottom: "2px",
+              lineHeight: "1.3"
             }}>
-              {achievement.display_name}
-              {achievement.unlocked && <FaCheck style={{ color: "#4CAF50", fontSize: "12px" }} />}
-              {achievement.hidden && !achievement.unlocked && <FaLock style={{ fontSize: "12px", opacity: 0.5 }} />}
+              <span style={{
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+                flex: 1
+              }}>
+                {achievement.display_name}
+              </span>
+              <div style={{ 
+                flexShrink: 0,
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+                paddingTop: "1px"
+              }}>
+                {achievement.unlocked && <FaCheck style={{ color: "#4CAF50", fontSize: "12px" }} />}
+                {achievement.hidden && !achievement.unlocked && <FaLock style={{ fontSize: "12px", opacity: 0.5 }} />}
+              </div>
             </div>
             <div style={{
               fontSize: "12px",
               opacity: 0.7,
-              marginTop: "2px"
+              textAlign: "left",
+              lineHeight: "1.3",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              display: "-webkit-box",
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: "vertical"
             }}>
               {!achievement.hidden || achievement.unlocked
                 ? achievement.description
@@ -59,15 +95,32 @@ export const AchievementItem: VFC<AchievementItemExtendedProps> = ({
           </div>
 
           {/* Rarity indicator */}
-          {achievement.global_percent !== null && achievement.global_percent <= 10 && (
+          {(achievement.global_percent !== null && achievement.global_percent !== undefined && !isNaN(achievement.global_percent) && achievement.global_percent > 0) && (
             <div style={{
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
-              minWidth: "40px"
+              minWidth: "35px",
+              flexShrink: 0,
+              alignSelf: "flex-start",
+              marginTop: "8px"
             }}>
-              <FaStar style={{ color: "#FFD700", fontSize: "16px" }} />
-              <span style={{ fontSize: "10px", opacity: 0.8 }}>
+              <FaStar style={{ 
+                color: achievement.global_percent <= 1 ? "#FFD700" : 
+                       achievement.global_percent <= 5 ? "#FF9800" : 
+                       achievement.global_percent <= 15 ? "#FFC107" :
+                       achievement.global_percent <= 50 ? "#4CAF50" : "#9E9E9E", 
+                fontSize: "14px" 
+              }} />
+              <span style={{ 
+                fontSize: "9px", 
+                opacity: 0.8, 
+                marginTop: "2px",
+                color: achievement.global_percent <= 1 ? "#FFD700" : 
+                       achievement.global_percent <= 5 ? "#FF9800" : 
+                       achievement.global_percent <= 15 ? "#FFC107" :
+                       achievement.global_percent <= 50 ? "#4CAF50" : "#9E9E9E"
+              }}>
                 {formatGlobalPercent(achievement.global_percent)}
               </span>
             </div>
@@ -76,4 +129,4 @@ export const AchievementItem: VFC<AchievementItemExtendedProps> = ({
       </ButtonItem>
     </PanelSectionRow>
   );
-};
+});

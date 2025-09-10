@@ -16,30 +16,33 @@ import {
   FaEye,
   FaTrash,
   FaGamepad,
-  FaUser,
   FaCheck,
-  FaTimes
-} from "react-icons/fa";
+  FaTimes,
+  FaTools
+} from "../../utils/icons";
 import { toaster } from "@decky/api";
+import { logger } from "../../utils/logger";
 import { UseSettingsReturn } from "../../hooks/useSettings";
-import { refreshCache } from "../../services/api";
 import { GameSelectionModal } from "../game/GameSelectionModal";
 import { ApiKeyModal } from "../modals/ApiKeyModal";
 import { AdvancedSettingsModal } from "../modals/AdvancedSettingsModal";
+import { TroubleshootingModal } from "../modals/TroubleshootingModal";
 import { GameInfo, TrackedGame } from "../../models";
+
 
 interface SettingsTabModalProps {
   settings: UseSettingsReturn;
-  installedGames: GameInfo[];
+  games: GameInfo[];
   trackedGame: TrackedGame | null;
   onFullRefresh?: () => Promise<void>;
+  onForceRefreshRecent?: () => Promise<void>;
   onSetTrackedGame: (game: TrackedGame) => Promise<void>;
   onClearTrackedGame: () => Promise<void>;
 }
 
 export const SettingsTabModal: VFC<SettingsTabModalProps> = ({
   settings,
-  installedGames,
+  games,
   trackedGame,
   onFullRefresh,
   onSetTrackedGame,
@@ -77,8 +80,20 @@ export const SettingsTabModal: VFC<SettingsTabModalProps> = ({
     );
   }, [settings]);
 
+  const handleOpenTroubleshooting = useCallback(() => {
+    let modalInstance: any = null;
+
+    modalInstance = showModal(
+      <TroubleshootingModal
+        settings={settings}
+        onFullRefresh={onFullRefresh}
+        closeModal={() => modalInstance?.Close()}
+      />
+    );
+  }, [settings, onFullRefresh]);
+
   const handleSelectTrackedGame = useCallback(() => {
-    if (installedGames.length === 0) {
+    if (!games?.length) {
       toaster.toast({
         title: "No Games Available",
         body: "Please visit the Overall tab first to load your games library.",
@@ -91,7 +106,7 @@ export const SettingsTabModal: VFC<SettingsTabModalProps> = ({
 
     modalInstance = showModal(
       <GameSelectionModal
-        games={installedGames}
+        games={games}
         onSelect={async (game) => {
           await onSetTrackedGame({
             app_id: game.app_id,
@@ -102,23 +117,8 @@ export const SettingsTabModal: VFC<SettingsTabModalProps> = ({
         closeModal={() => modalInstance?.Close()}
       />
     );
-  }, [installedGames, onSetTrackedGame]);
+  }, [games, onSetTrackedGame]);
 
-  const handleClearCache = async () => {
-    try {
-      await refreshCache();
-      toaster.toast({
-        title: "Cache Cleared",
-        body: "Achievement cache has been cleared!"
-      });
-    } catch (error) {
-      toaster.toast({
-        title: "Error",
-        body: "Failed to clear cache",
-        critical: true
-      });
-    }
-  };
 
   return (
     <div style={{ padding: "0", margin: "0" }}>
@@ -158,22 +158,6 @@ export const SettingsTabModal: VFC<SettingsTabModalProps> = ({
           </div>
         </PanelSectionRow>
 
-        {settings.steamUserId && (
-          <PanelSectionRow>
-            <div style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "8px",
-              fontSize: "12px",
-              opacity: 0.7,
-              fontFamily: "monospace"
-            }}>
-              <FaUser style={{ fontSize: "10px" }} />
-              User ID: {settings.steamUserId}
-            </div>
-          </PanelSectionRow>
-        )}
       </PanelSection>
 
       {/* Main Configuration Actions */}
@@ -217,9 +201,6 @@ export const SettingsTabModal: VFC<SettingsTabModalProps> = ({
               <div>
                 <div style={{ fontSize: "14px", fontWeight: "bold" }}>
                   Testing Options
-                </div>
-                <div style={{ fontSize: "12px", opacity: 0.7 }}>
-                  Test specific games for development
                 </div>
               </div>
             </div>
@@ -281,14 +262,14 @@ export const SettingsTabModal: VFC<SettingsTabModalProps> = ({
               onClick={() => {
                 showContextMenu(
                   <Menu label="Refresh Interval">
-                    <MenuItem onClick={() => settings.saveRefreshInterval(15)}>
-                      15 seconds
-                    </MenuItem>
                     <MenuItem onClick={() => settings.saveRefreshInterval(30)}>
                       30 seconds
                     </MenuItem>
                     <MenuItem onClick={() => settings.saveRefreshInterval(60)}>
-                      1 minute
+                      1 minute (recommended)
+                    </MenuItem>
+                    <MenuItem onClick={() => settings.saveRefreshInterval(120)}>
+                      2 minutes
                     </MenuItem>
                     <MenuItem onClick={() => settings.saveRefreshInterval(300)}>
                       5 minutes
@@ -372,7 +353,7 @@ export const SettingsTabModal: VFC<SettingsTabModalProps> = ({
                   try {
                     await onClearTrackedGame();
                   } catch (error) {
-                    console.error("Failed to clear tracked game:", error);
+                    logger.error("Failed to clear tracked game:", error);
                   }
                 }}
               >
@@ -408,47 +389,66 @@ export const SettingsTabModal: VFC<SettingsTabModalProps> = ({
         )}
       </PanelSection>
 
-      {/* Maintenance Section */}
-      <PanelSection title="Maintenance">
+      {/* Troubleshooting Section */}
+      <PanelSection title="Troubleshooting">
         <PanelSectionRow>
-          <ButtonItem
-            layout="below"
-            onClick={handleClearCache}
-          >
-            <div style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              fontSize: "14px"
-            }}>
-              <FaTrash style={{ fontSize: "12px" }} />
-              Clear Cache
-            </div>
-          </ButtonItem>
-        </PanelSectionRow>
-
-        <PanelSectionRow>
-          <ButtonItem
-            layout="below"
-            onClick={settings.handleReloadSettings}
-          >
-            <div style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              fontSize: "14px"
-            }}>
-              <FaSync style={{ fontSize: "12px" }} />
-              Reload Settings
-            </div>
-          </ButtonItem>
-        </PanelSectionRow>
-
-        <PanelSectionRow>
-          <div style={{ fontSize: "11px", opacity: 0.6 }}>
-            Use if settings aren't updating properly
+          <div style={{ fontSize: "12px", opacity: 0.8, marginBottom: "12px" }}>
+            Having issues? Access diagnostic tools and fixes:
           </div>
         </PanelSectionRow>
+
+        <PanelSectionRow>
+          <ButtonItem
+            layout="below"
+            onClick={handleOpenTroubleshooting}
+          >
+            <div style={{
+              display: "flex",
+              textAlign: "left",
+              gap: "12px",
+              padding: "6px 0"
+            }}>
+              <FaTools style={{ 
+                fontSize: "18px", 
+                color: "#4a9eff", 
+                width: "18px", 
+                textAlign: "center", 
+                display: "inline-block",
+                marginTop: "2px"
+              }} />
+              <div>
+                <div style={{ fontSize: "14px", fontWeight: "bold" }}>
+                  Open Troubleshooting Tools
+                </div>
+              </div>
+            </div>
+          </ButtonItem>
+        </PanelSectionRow>
+
+        {onFullRefresh && (
+          <PanelSectionRow>
+            <ButtonItem
+              layout="below"
+              onClick={async () => {
+                try {
+                  await onFullRefresh();
+                } catch (error) {
+                  logger.error("Force refresh failed:", error);
+                }
+              }}
+            >
+              <div style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                fontSize: "14px"
+              }}>
+                <FaSync style={{ fontSize: "14px" }} />
+                Force Refresh All Data
+              </div>
+            </ButtonItem>
+          </PanelSectionRow>
+        )}
       </PanelSection>
     </div>
   );
