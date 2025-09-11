@@ -1,6 +1,6 @@
 {
   "name": "decky-achievement",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "A template to quickly create decky plugins from scratch, based on TypeScript and webpack",
   "type": "module",
   "scripts": {
