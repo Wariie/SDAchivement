@@ -11,7 +11,7 @@ import os
 
 # Add lib path
 plugin_dir = os.path.dirname(os.path.realpath(__file__))
-lib_path = os.path.join(plugin_dir, "externals")
+lib_path = os.path.join(plugin_dir, "externals", "cachetools", "src")
 sys.path.insert(0, lib_path)
 
 # Use cachetools for better LRU+TTL caching (available via submodule)
